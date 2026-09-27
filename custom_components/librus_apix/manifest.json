@@ -1,0 +1,13 @@
+{
+  "domain": "librus_apix",
+  "name": "Librus Synergia — Smart Home With Me",
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://www.smarthomewithme.com",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "requirements": [
+    "librus-apix==1.5.1"
+  ],
+  "version": "1.6.1"
+}
