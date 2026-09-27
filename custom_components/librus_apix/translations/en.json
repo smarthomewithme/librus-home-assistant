@@ -1,0 +1,48 @@
+{
+  "title": "Librus Synergia — Smart Home With Me",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect Librus Synergia",
+        "description": "Enter the student's Librus Synergia credentials. This is an unofficial integration.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not sign in to Librus. Check the credentials and Librus availability.",
+      "unknown": "An unexpected error occurred. Check the Home Assistant logs."
+    },
+    "abort": {
+      "already_configured": "This Librus account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Data refresh",
+        "description": "In automatic mode the integration adapts the polling interval to the time of day. You can also force a fixed interval. Manual refresh buttons remain available.",
+        "data": {
+          "refresh_mode": "Data refresh mode",
+          "data_refresh_interval": "Custom data interval",
+          "timetable_refresh_interval": "Timetable"
+        },
+        "data_description": {
+          "refresh_mode": "Automatic: 5 min on weekdays 06:00–18:00, 15 min 18:00–22:00, 30 min on weekends 06:00–22:00 and 60 min at night.",
+          "data_refresh_interval": "Used only in Custom interval mode. Range: 5–360 minutes.",
+          "timetable_refresh_interval": "Interval in minutes (30–720). Default: 120 minutes. Additional checks at 04:00 and 20:30 remain active."
+        }
+      }
+    }
+  },
+  "selector": {
+    "refresh_mode": {
+      "options": {
+        "auto": "Automatic",
+        "manual": "Custom interval"
+      }
+    }
+  }
+}
