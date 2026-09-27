@@ -1,0 +1,52 @@
+name: Repair Librus 1.6.1 package
+
+on:
+  push:
+    paths:
+      - 'repair/READY'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rebuild exact v1.6.1 core files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p custom_components/librus_apix
+          base64 -d repair/api.py.gz.b64 | gzip -d > custom_components/librus_apix/api.py
+          base64 -d repair/coordinator.py.gz.b64 | gzip -d > custom_components/librus_apix/coordinator.py
+          base64 -d repair/sensor.py.gz.b64 | gzip -d > custom_components/librus_apix/sensor.py
+
+          python -m py_compile \
+            custom_components/librus_apix/api.py \
+            custom_components/librus_apix/coordinator.py \
+            custom_components/librus_apix/sensor.py \
+            custom_components/librus_apix/timetable_coordinator.py \
+            custom_components/librus_apix/config_flow.py \
+            custom_components/librus_apix/__init__.py
+
+          git diff --check
+
+      - name: Remove temporary repair files
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf repair
+          rm -f .github/workflows/repair-v161.yml
+
+      - name: Commit repaired package
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "SmartHomeWithMe"
+          git config user.email "smarthomewithme@gmail.com"
+          git add -A
+          git commit -m "Repair complete Librus v1.6.1 core package"
+          git push
