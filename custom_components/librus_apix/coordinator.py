@@ -159,8 +159,11 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             prepared_grades = list(previous.get("oceny", []))
             grouped_grades = dict(previous.get("oceny_wg_przedmiotu", {}))
             prepared_behavior = list(previous.get("zachowanie", []))
-            _LOGGGER.warning("Nie udało się pobraŇ ocen; zachowuję poprzednie dane")
-      else:
+            _LOGGER.warning("Nie udało się pobrać ocen; zachowuję poprzednie dane")
+        else:
+            # Zwykłe oceny i zachowanie klasyfikacyjne pochodzą z librus-apix.
+            # Bieżąca tabela Zachowanie jest pobierana osobno, bo ma inny
+            # układ HTML i kolumnę K będącą wyłącznie odsyłaczem do komentarza.
             academic_grades = [
                 grade
                 for grade in grades
@@ -189,62 +192,112 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         "ocena": grade["grade"],
                         "data": grade["date"],
                         "kategoria": grade["category"],
-                        "komentarz": grade["comment"],
-                        "nauczyciel": grade["eacher"],
+                        "komentarz": grade.get("comment", ""),
+                        "nauczyciel": grade["teacher"],
+                        "semestr": grade.get("semester"),
                         "jest_nowa": _is_recent(grade["date"]),
                     }
                 )
-            grouped_grades = {key: value for key, value in grouped.items()}
+            grouped_grades = dict(grouped)
 
         if current_behavior is None:
             prepared_current_behavior = list(previous.get("zachowanie_biezace", []))
-            _LOGGER.warning("Nie udało się prać bieżącego zachowania; zachowuję poprzednie dane")
+            raw_current_behavior = None
+            _LOGGER.warning(
+                "Nie udało się pobrać bieżącego zachowania; zachowuję poprzednie dane"
+            )
         else:
+            raw_current_behavior = current_behavior
             prepared_current_behavior = [
-               {
-                    "wartosc": item.get("grade", ""),
-                    "data": item.get("date", ""),
-                    "kategoria": item.get("category", ""),
-                    "komentarz": item.get("comment", ""),
-                    "ma_komentarz": item.get("has_comment", False),
-                    "znacznik_komentarza": item.get("comment_marker", ""),
-                    "nauczyciel": item.get("teacher", ""),
-                    "semestr": item.get("semester"),
-                    "jest_nowy": _is_recent(item.get("date", ""))
+                {
+                    # Kod (np. 3bb) zachowujemy 1:1, bez interpretowania.
+                    "wartosc": str(entry.get("grade", "") or ""),
+                    "data": entry.get("date", ""),
+                    "kategoria": entry.get("category", ""),
+                    # To jest faktyczna treść otwierana po kliknięciu K.
+                    # Sam znacznik K jest szczegółem interfejsu Librusa i nie
+                    # zaśmieca atrybutów Home Assistanta.
+                    "komentarz": entry.get("comment", ""),
+                    "nauczyciel": entry.get("teacher", ""),
+                    "semestr": entry.get("semester"),
+                    "jest_nowy": _is_recent(str(entry.get("date", ""))),
                 }
-                for item in current_behavior
+                for entry in current_behavior
             ]
 
         if notes is None:
             prepared_notes = list(previous.get("uwagi", []))
-            _LOGGER.warning("Nie udało się pobraŇ uwag; zachowuję prezednie dane")
+            raw_notes = None
+            _LOGGER.warning("Nie udało się pobrać uwag; zachowuję poprzednie dane")
         else:
+            raw_notes = notes
             prepared_notes = [
-                {**item, "jest_nowa": _is_recent(str(item.get("data", "")))}
-                for item in notes
+                {
+                    "tresc": str(entry.get("content", "") or ""),
+                    "data": str(entry.get("date", "") or ""),
+                    "dodal": str(entry.get("author", "") or ""),
+                    "rodzaj": str(entry.get("type", "") or ""),
+                    "kategoria": str(entry.get("category", "") or ""),
+                    "jest_nowa": _is_recent(str(entry.get("date", "") or "")),
+                }
+                for entry in notes
             ]
 
         if achievements is None:
             prepared_achievements = list(previous.get("szczegolne_osiagniecia", []))
-            _LOGGER.warning("Nie udało się prać szczegollych osiagniecę; ztanyam poprzednie dane")
+            raw_achievements = None
+            _LOGGER.warning(
+                "Nie udało się pobrać szczególnych osiągnięć; zachowuję poprzednie dane"
+            )
         else:
-            prepared_achievements = list(achievements)
+            raw_achievements = achievements
+            prepared_achievements = [dict(entry) for entry in achievements]
 
-        prepared_messages = self._prepare_messages(messages) if messages is not None else list(previous.get("wiadomosci", []))
-        prepared_homework = self._prepare_homework(homework) if homework is not None else list(previous.get("zadania", []))
-        prepared_schedule = list(schedule or previous.get("terminarza", []))
-        prepared_attendance = list(attendance or previous.get("frekwencja", []))
-        prepared_announcements = list(announcements or previous.get("ogloszenia", []))
-
-        self._fire_new_message_and_grade_events(prepared_messages, prepared_grades)
-        self._fire_new_behavior_events(prepared_current_behavior)
-        self._fire_new_note_events(prepared_notes)
-        self._fire_new_achievement_events(prepared_achievements)
-        self._fire_new_homework_events(prepared_homework)
-        self._fire_new_schedule_events(prepared_schedule)
-
-        return {
-            "uczen": student,
+        prepared_messages = (
+            self._prepare_messages(messages)
+            if messages is not None
+            else list(previous.get("wiadomosci", []))
+        )
+        prepared_homework = (
+            self._prepare_homework(homework)
+            if homework is not None
+            else list(previous.get("zadania", []))
+        )
+        prepared_schedule = (
+            schedule if schedule is not None else list(previous.get("terminarz", []))
+        )
+        prepared_attendance = (
+            attendance
+            if attendance is not None
+            else list(previous.get("frekwencja", []))
+        )
+        prepared_announcements = (
+            announcements
+            if announcements is not None
+            else list(previous.get("ogloszenia", []))
+        )
+        stale_sections = [
+            name
+            for name, value in (
+                ("oceny", grades),
+                ("zachowanie_biezace", current_behavior),
+                ("uwagi", notes),
+                ("szczegolne_osiagniecia", achievements),
+                ("wiadomosci", messages),
+                ("zadania", homework),
+                ("terminarz", schedule),
+                ("frekwencja", attendance),
+                ("ogloszenia", announcements),
+            )
+            if value is None
+        ]
+        last_successful_update = (
+            dt_util.utcnow().isoformat()
+            if len(stale_sections) < 9
+            else previous.get("ostatnia_poprawna_aktualizacja")
+        )
+        result = {
+            "student_info": student or previous.get("student_info"),
             "oceny": prepared_grades,
             "oceny_wg_przedmiotu": grouped_grades,
             "zachowanie": prepared_behavior,
@@ -257,16 +310,144 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "frekwencja": prepared_attendance,
             "ogloszenia": prepared_announcements,
             "semestr_biezacy": current_semester(),
-            "refresh_mode": self._refresh_mode,
-            "refresh_interval_minutes": self._current_refresh_interval_minutes,
+            "ostatnia_poprawna_aktualizacja": last_successful_update,
+            "nieodswiezone_sekcje": stale_sections,
         }
+
+        self._track_changes(
+            raw_messages=messages,
+            raw_grades=(
+                [
+                    grade
+                    for grade in grades
+                    if grade.get("type") not in {"behavior", "behavior_current"}
+                ]
+                if grades is not None
+                else None
+            ),
+            raw_behavior=raw_current_behavior,
+            raw_notes=raw_notes,
+            raw_achievements=raw_achievements,
+            raw_homework=homework,
+            raw_schedule=schedule,
+            messages=prepared_messages,
+            grades=prepared_grades,
+            behavior=prepared_current_behavior,
+            notes=prepared_notes,
+            achievements=prepared_achievements,
+            homework=prepared_homework,
+            schedule=prepared_schedule,
+        )
+
+        return result
+
+    def _track_changes(
+        self,
+        *,
+        raw_messages: list[dict[str, Any]] | None,
+        raw_grades: list[dict[str, Any]] | None,
+        raw_behavior: list[dict[str, Any]] | None,
+        raw_notes: list[dict[str, Any]] | None,
+        raw_achievements: list[dict[str, Any]] | None,
+        raw_homework: list[Any] | None,
+        raw_schedule: list[dict[str, Any]] | None,
+        messages: list[dict[str, Any]],
+        grades: list[dict[str, Any]],
+        behavior: list[dict[str, Any]],
+        notes: list[dict[str, Any]],
+        achievements: list[dict[str, Any]],
+        homework: list[dict[str, Any]],
+        schedule: list[dict[str, Any]],
+    ) -> None:
+        """Pierwszy poprawny wynik zapamiętaj, kolejne zamień na zdarzenia."""
+        messages_to_fire: list[dict[str, Any]] = []
+        grades_to_fire: list[dict[str, Any]] = []
+        behavior_to_fire: list[dict[str, Any]] = []
+        notes_to_fire: list[dict[str, Any]] = []
+        achievements_to_fire: list[dict[str, Any]] = []
+
+        if raw_messages is not None:
+            if "messages" in self._initialized_sections:
+                messages_to_fire = messages
+            else:
+                self._seen_message_hrefs.update(
+                    message["href"] for message in messages if message.get("href")
+                )
+                self._initialized_sections.add("messages")
+
+        if raw_grades is not None:
+            if "grades" in self._initialized_sections:
+                grades_to_fire = grades
+            else:
+                self._seen_grade_ids.update(
+                    self._grade_id(grade) for grade in grades
+                )
+                self._initialized_sections.add("grades")
+
+        if raw_behavior is not None:
+            if "behavior_current" in self._initialized_sections:
+                behavior_to_fire = behavior
+            else:
+                self._seen_behavior_ids.update(
+                    self._behavior_id(item) for item in behavior
+                )
+                self._initialized_sections.add("behavior_current")
+
+        if raw_notes is not None:
+            if "notes" in self._initialized_sections:
+                notes_to_fire = notes
+            else:
+                self._seen_note_ids.update(self._note_id(item) for item in notes)
+                self._initialized_sections.add("notes")
+
+        if raw_achievements is not None:
+            if "achievements" in self._initialized_sections:
+                achievements_to_fire = achievements
+            else:
+                self._seen_achievement_ids.update(
+                    self._achievement_id(item) for item in achievements
+                )
+                self._initialized_sections.add("achievements")
+
+        if messages_to_fire or grades_to_fire:
+            self._fire_new_message_and_grade_events(
+                messages_to_fire,
+                grades_to_fire,
+            )
+
+        if behavior_to_fire:
+            self._fire_new_behavior_events(behavior_to_fire)
+
+        if notes_to_fire:
+            self._fire_new_note_events(notes_to_fire)
+
+        if achievements_to_fire:
+            self._fire_new_achievement_events(achievements_to_fire)
+
+        if raw_homework is not None:
+            if "homework" in self._initialized_sections:
+                self._fire_new_homework_events(homework)
+            else:
+                self._seen_homework_ids.update(
+                    self._homework_id(item) for item in homework
+                )
+                self._initialized_sections.add("homework")
+
+        if raw_schedule is not None:
+            if "schedule" in self._initialized_sections:
+                self._fire_new_schedule_events(schedule)
+            else:
+                self._seen_schedule_ids.update(
+                    self._schedule_id(item) for item in schedule
+                )
+                self._initialized_sections.add("schedule")
 
     @staticmethod
     def _prepare_messages(
         messages: list[dict[str, Any]] | None,
     ) -> list[dict[str, Any]]:
         return [
-            {**message, "jest_nowa": _is_recent(str(message.get("data", "")))}
+            {**message, "jest_nowa": _is_recent(str(message.get("date", "")))}
             for message in messages or []
         ]
 
@@ -390,7 +571,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
     def _fire_new_note_events(self, notes: list[dict[str, Any]]) -> None:
-        """Wyślij zdarzenie tylko dla nowych bieżących wpisów zachowania."""
+        """Wyślij zdarzenie dla każdej nowej uwagi z dedykowanej strony Uwagi."""
         for item in notes:
             identifier = self._note_id(item)
             if identifier in self._seen_note_ids:
@@ -399,7 +580,6 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.hass.bus.async_fire(
                 EVENT_NEW_NOTE,
                 {
-
                     "tresc": item.get("tresc", ""),
                     "data": item.get("data", ""),
                     "dodal": item.get("dodal", ""),
@@ -411,7 +591,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def _fire_new_achievement_events(
         self, achievements: list[dict[str, Any]]
     ) -> None:
-        """Wyślij zdarzenie, gdy Librus doda nowe szczególne osiągniecie."""
+        """Wyślij zdarzenie, gdy Librus doda nowe szczególne osiągnięcie."""
         for item in achievements:
             identifier = self._achievement_id(item)
             if identifier in self._seen_achievement_ids:
@@ -431,7 +611,6 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.hass.bus.async_fire(
                 EVENT_NEW_HOMEWORK,
                 {
-
                     "przedmiot": item.get("przedmiot", ""),
                     "kategoria": item.get("kategoria", ""),
                     "termin": item.get("termin", ""),

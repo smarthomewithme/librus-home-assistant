@@ -39,7 +39,7 @@ _GRADE_METADATA_PREFIXES = (
     "obowiÄ…zek wyk. zadania:",
     "obowiazek wyk. zadania:",
 )
-_COMMENT_PATH_RE = re.compile(r"[\"'](/komentarz_oceny/\d+/\d+)[\#']")
+_COMMENT_PATH_RE = re.compile(r"[\"'](/komentarz_oceny/\d+/\d+)[\"']")
 
 
 def _comment_from_description(description: str) -> str:
@@ -218,4 +218,673 @@ def current_semester(today: date | None = None) -> int:
 
 
 def _is_grade(value: str) -> bool:
-    """SprawdÅº, czy opisowa pozycja jest zwykÅ‚Ä… ocenÄ… liczbowÄ…²È="25åÌôÌÀ¤¤¹ÍÑÉ™Ñ¥µ” ˆ•d´•´´•ˆ¤°(€€€€€€€€€€€€¤((€€€€€€€É•ÑÕÉ¸…Ý…¥ÐÍ•±˜¹}…±±}Ý¥Ñ¡}É•ÑÉä ‰é…‘‡ˆ°É•ÅÕ•ÍÐ¤((€€€…Íå¹Œ‘•˜…Íå¹}•Ñ}…ÑÑ•¹‘…¹”¡Í•±˜¤€´ø±¥ÍÑm‘¥ÑmÍÑÈ°¹åutð9½¹”è(€€€€€€€€ˆˆ‰A½‰¥•ÉèÝÁ¥Íä™É•­Ý•¹©¤é”ÝÍéåÍÑ­¥ éÝËÍ½¹å Í•µ•ÍÑËÍÜ¸ˆˆˆ((€€€€€€€…Íå¹Œ‘•˜É•ÅÕ•ÍÐ ¤€´ø±¥ÍÑm‘¥ÑmÍÑÈ°¹åutè(€€€€€€€€€€€™É½´±¥‰ÉÕÍ}…Á¥à¹…ÑÑ•¹‘…¹”¥µÁ½ÉÐ•Ñ}…ÑÑ•¹‘…¹”((€€€€€€€€€€€Í•µ•ÍÑ•ÉÌ€ô…Ý…¥ÐÍ•±˜¹}ÉÕ¹}‰±½­¥¹œ (€€€€€€€€€€€€€€€•Ñ}…ÑÑ•¹‘…¹”°Í•±˜¹}±¥•¹Ð(€€€€€€€€€€€€¤(€€€€€€€€€€€É•ÍÕ±Ðè±¥ÍÑm‘¥ÑmÍÑÈ°¹åut€ômt(€€€€€€€€€€€™½ÈÍ•µ•ÍÑ•È¥¸Í•µ•ÍÑ•ÉÌ½Èmtè(€€€€€€€€€€€€€€€™½È•¹ÑÉä¥¸Í•µ•ÍÑ•È½Èmtè(€€€€€€€€€€€€€€€€€€€É•ÍÕ±Ð¹…ÁÁ•¹ (€€€€€€€€€€€€€€€€€€€€€€€ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰Íåµ‰½°ˆèÍÑÈ¡•Ñ…ÑÑÈ¡•¹ÑÉä°€‰Íåµ‰½°ˆ°€ˆˆ¤½È€ˆˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰ÑåÀˆèÍÑÈ¡•Ñ…ÑÑÈ¡•¹ÑÉä°€‰ÑåÁ”ˆ°€ˆˆ¤½È€ˆˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰‘…Ñ„ˆèÍÑÈ¡•Ñ…ÑÑÈ¡•¹ÑÉä°€‰‘…Ñ”ˆ°€ˆˆ¤½È€ˆˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰ÁÉé•‘µ¥½ÐˆèÍÑÈ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€•Ñ…ÑÑÈ¡•¹ÑÉä°€‰ÍÕ‰©•Ðˆ°€ˆˆ¤½È€ˆˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰¹…Õéå¥•°ˆèÍÑÈ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€•Ñ…ÑÑÈ¡•¹ÑÉä°€‰Ñ•…¡•Èˆ°€ˆˆ¤½È€ˆˆ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰½‘é¥¹„ˆè•Ñ…ÑÑÈ¡•¹ÑÉä°€‰Á•É¥½ˆ°9½¹”¤°(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€É•ÑÕÉ¸É•ÍÕ±Ð((€€€€€€€É•ÑÕÉ¸…Ý…¥ÐÍ•±˜¹}…±±}Ý¥Ñ¡}É•ÑÉä ‰™É•­Ý•¹©¤ˆ°É•ÅÕ•ÍÐ¤((€€€…Íå¹Œ‘•˜…Íå¹}•Ñ}…¹¹½Õ¹•µ•¹ÑÌ¡Í•±˜¤€´ø±¥ÍÑm‘¥ÑmÍÑÈ°ÍÑÉutð9½¹”è(€€€€€€€€ˆˆ‰A½‰¥•Éè½Ÿ	½Íé•¹¥„Íé­½±¹”¸ˆˆˆ((€€€€€€€…Íå¹Œ‘•˜É•ÅÕ•ÍÐ ¤€´ø±¥ÍÑm‘¥ÑmÍÑÈ°ÍÑÉutè(€€€€€€€€€€€™É½´±¥‰ÉÕÍ}…Á¥à¹…¹¹½Õ¹•µ•¹ÑÌ¥µÁ½ÉÐ•Ñ}…¹¹½Õ¹•µ•¹ÑÌ((€€€€€€€€€€€…¹¹½Õ¹•µ•¹ÑÌ€ô…Ý…¥ÐÍ•±˜¹}ÉÕ¹}‰±½­¥¹œ (€€€€€€€€€€€€€€€•Ñ}…¹¹½Õ¹•µ•¹ÑÌ°Í•±˜¹}±¥•¹Ð(€€€€€€€€€€€€¤(€€€€€€€€€€€É•ÑÕÉ¸l(€€€€€€€€€€€€€€€ì(€€€€€€€€€€€€€€€€€€€€‰ÑåÑÕ°ˆèÍÑÈ (€€€€€€€€€€€€€€€€€€€€€€€•Ñ…ÑÑÈ¡…¹¹½Õ¹•µ•¹Ð°€‰Ñ¥Ñ±”ˆ°€ˆˆ¤½È€ˆˆ(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€€‰¹…‘…Ý„ˆèÍÑÈ (€€€€€€€€€€€€€€€€€€€€€€€•Ñ…ÑÑÈ¡…¹¹½Õ¹•µ•¹Ð°€‰…ÕÑ¡½Èˆ°€ˆˆ¤½È€ˆˆ(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€€‰½Á¥ÌˆèÍÑÈ (€€€€€€€€€€€€€€€€€€€€€€€•Ñ…ÑÑÈ¡…¹¹½Õ¹•µ•¹Ð°€‰‘•ÍÉ¥ÁÑ¥½¸ˆ°€ˆˆ¤½È€ˆˆ(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€€‰‘…Ñ„ˆèÍÑÈ (€€€€€€€€€€€€€€€€€€€€€€€•Ñ…ÑÑÈ¡…¹¹½Õ¹•µ•¹Ð°€‰‘…Ñ”ˆ°€ˆˆ¤½È€ˆˆ(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€™½È…¹¹½Õ¹•µ•¹Ð¥¸…¹¹½Õ¹•µ•¹ÑÌ½Èmt(€€€€€€€€€€€t((€€€€€€€É•ÑÕÉ¸…Ý…¥ÐÍ•±˜¹}…±±}Ý¥Ñ¡}É•ÑÉä ‰½Ÿ	½Íé—ˆ°É•ÅÕ•ÍÐ¤((€€€ÍÑ…Ñ¥µ•Ñ¡½(€€€‘•˜}™•Ñ¡}Í¡•‘Õ±”¡±¥•¹Ðè±¥•¹Ð°Ñ½‘…äè‘…Ñ”¤€´ø±¥ÍÑm‘¥ÑmÍÑÈ°¹åutè(€€€€€€€€ˆˆ‰A½‰¥•Éè‰¥—óä¤¹…ÍÓeÁ¹äµ¥•Í§ŒÑ•Éµ¥¹…Éé„¸ˆˆˆ(€€€€€€€™É½´±¥‰ÉÕÍ}…Á¥à¹Í¡•‘Õ±”¥µÁ½ÉÐ•Ñ}Í¡•‘Õ±”((€€€€€€€µ½¹Ñ¡Ì€ôl(€€€€€€€€€€€€¡Ñ½‘…ä¹å•…È°Ñ½‘…ä¹µ½¹Ñ ¤°(€€€€€€€€€€€€ (€€€€€€€€€€€€€€€Ñ½‘…ä¹å•…È€¬€Ä¥˜Ñ½‘…ä¹µ½¹Ñ €ôô€ÄÈ•±Í”Ñ½‘…ä¹å•…È°(€€€€€€€€€€€€€€€€Ä¥˜Ñ½‘…ä¹µ½¹Ñ €ôô€ÄÈ•±Í”Ñ½‘…ä¹µ½¹Ñ €¬€Ä°(€€€€€€€€€€€€¤°(€€€€€€€t(€€€€€€€•Ù•¹ÑÌè±¥ÍÑm‘¥ÑmÍÑÈ°¹åut€ômt(€€€€€€€™½Èå•…È°µ½¹Ñ ¥¸µ½¹Ñ¡Ìè(€€€€€€€€€€€µ½¹Ñ¡±ä€ô•Ñ}Í¡•‘Õ±”¡±¥•¹Ð°˜‰íµ½¹Ñ èÀÉ‘ôˆ°ÍÑÈ¡å•…È¤¤½Èíô(€€€€€€€€€€€™½È‘…å}¹Õµ‰•È°‘…å}•Ù•¹ÑÌ¥¸µ½¹Ñ¡±ä¹¥Ñ•µÌ ¤è(€€€€€€€€€€€€€€€•Ù•¹Ñ}‘…Ñ”€ô‘…Ñ”¡å•…È°µ½¹Ñ °¥¹Ð¡‘…å}¹Õµ‰•È¤¤(€€€€€€€€€€€€€€€¥˜•Ù•¹Ñ}‘…Ñ”€ðÑ½‘…äè(€€€€€€€€€€€€€€€€€€€½¹Ñ¥¹Õ”(€€€€€€€€€€€€€€€™½È•Ù•¹Ð¥¸‘…å}•Ù•¹ÑÌè(€€€€€€€€€€€€€€€€€€€•Ù•¹ÑÌ¹…ÁÁ•¹ (€€€€€€€€€€€€€€€€€€€€€€€ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰‘…Ñ„ˆè•Ù•¹Ñ}‘…Ñ”¹¥Í½™½Éµ…Ð ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰Ñå‘é¥•¸ˆè•Ù•¹Ñ}‘…Ñ”¹ÍÑÉ™Ñ¥µ” ˆ•ˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰ÑåÑÕ°ˆè•Ù•¹Ð¹Ñ¥Ñ±”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰ÁÉé•‘µ¥½Ðˆè•Ù•¹Ð¹ÍÕ‰©•Ð°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰½‘é¥¹„ˆè•Ù•¹Ð¹¡½ÕÈ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰¹Õµ•É}±•­©¤ˆè•Ù•¹Ð¹¹Õµ‰•È°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰Íéé•½±äˆè•Ù•¹Ð¹‘…Ñ„°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰¡É•˜ˆè•Ù•¹Ð¹¡É•˜°(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€É•ÑÕÉ¸Í½ÉÑ•¡•Ù•¹ÑÌ°­•äõ±…µ‰‘„¥Ñ•´è¥Ñ•µl‰‘…Ñ„‰t¤((€€€…Íå¹Œ‘•˜…Íå¹}•Ñ}Í¡•‘Õ±”¡Í•±˜¤€´ø±¥ÍÑm‘¥ÑmÍÑÈ°¹åutð9½¹”è(€€€€€€€€ˆˆ‰A½‰¥•Éè¹…‘¡½‘ë”ÝÁ¥ÍäÑ•Éµ¥¹…Éé„¸ˆˆˆ((€€€€€€€…Íå¹Œ‘•˜É•ÅÕ•ÍÐ ¤€´ø±¥ÍÑm‘¥ÑmÍÑÈ°¹åutè(€€€€€€€€€€€É•ÑÕÉ¸…Ý…¥ÐÍ•±˜¹}ÉÕ¹}‰±½­¥¹œ (€€€€€€€€€€€€€€€Í•±˜¹}™•Ñ¡}Í¡•‘Õ±”°Í•±˜¹}±¥•¹Ð°‘…Ñ”¹Ñ½‘…ä ¤(€€€€€€€€€€€€¤((€€€€€€€É•ÑÕÉ¸…Ý…¥ÐÍ•±˜¹}…±±}Ý¥Ñ¡}É•ÑÉä ‰Ñ•Éµ¥¹…Éé„ˆ°É•ÅÕ•ÍÐ¤((€€€…Íå¹Œ‘•˜…Íå¹}•Ñ}Í¡•‘Õ±•}½¹Ñ•¹Ð (€€€€€€€Í•±˜°¡É•˜èÍÑÈ(€€€€¤€´ø‘¥ÑmÍÑÈ°ÍÑÉtð9½¹”è(€€€€€€€€ˆˆ‰A½‰¥•ÉèÁ—	¹”Íéé•ŸÏ	ä©•‘¹•¼ÝÁ¥ÍÔÑ•Éµ¥¹…Éé„¸ˆˆˆ(€€€€€€€¥˜¹½Ð¡É•˜½È€ˆ¼ˆ¹½Ð¥¸¡É•˜è(€€€€€€€€€€€É•ÑÕÉ¸9½¹”((€€€€€€€ÁÉ•™¥à°‘•Ñ…¥±}ÕÉ°€ô¡É•˜¹ÍÁ±¥Ð ˆ¼ˆ°€Ä¤(€€€€€€€¥˜¹½ÐÁÉ•™¥à½È¹½Ð‘•Ñ…¥±}ÕÉ°è(€€€€€€€€€€€É•ÑÕÉ¸9½¹”((€€€€€€€…Íå¹Œ‘•˜É•ÅÕ•ÍÐ ¤€´ø‘¥ÑmÍÑÈ°ÍÑÉtð9½¹”è(€€€€€€€€€€€™É½´±¥‰ÉÕÍ}…Á¥à¹Í¡•‘Õ±”¥µÁ½ÉÐÍ¡•‘Õ±•}‘•Ñ…¥°((€€€€€€€€€€€‘•Ñ…¥±Ì€ô…Ý…¥ÐÍ•±˜¹}ÉÕ¹}‰±½­¥¹œ (€€€€€€€€€€€€€€€Í¡•‘Õ±•}‘•Ñ…¥°°Í•±˜¹}±¥•¹Ð°ÁÉ•™¥à°‘•Ñ…¥±}ÕÉ°(€€€€€€€€€€€€¤(€€€€€€€€€€€¥˜‘•Ñ…¥±Ì¥Ì9½¹”è(€€€€€€€€€€€€€€€É•ÑÕÉ¸9½¹”(€€€€€€€€€€€É•ÑÕÉ¸ì(€€€€€€€€€€€€€€€ÍÑÈ¡­•ä¤¹ÍÑÉ¥À ¤èÍÑÈ¡Ù…±Õ”½È€ˆˆ¤¹ÍÑÉ¥À ¤(€€€€€€€€€€€€€€€™½È­•ä°Ù…±Õ”¥¸‘•Ñ…¥±Ì¹¥Ñ•µÌ ¤(€€€€€€€€€€€ô((€€€€€€€É•ÑÕÉ¸…Ý…¥ÐÍ•±˜¹}…±±}Ý¥Ñ¡}É•ÑÉä ‰ÑÉ—m¤ÝÁ¥ÍÔÑ•Éµ¥¹…Éé„ˆ°É•ÅÕ•ÍÐ¤((€€€…Íå¹Œ‘•˜…Íå¹}•Ñ}ÍÑÕ‘•¹Ñ}¥¹™½Éµ…Ñ¥½¸¡Í•±˜¤€´ø¹äð9½¹”è(€€€€€€€€ˆˆ‰A½‰¥•ÉèÁ½‘ÍÑ…Ý½Ý”¥¹™½Éµ…©”¼Õé¹¥Ô¸ˆˆˆ((€€€€€€€…Íå¹Œ‘•˜É•ÅÕ•ÍÐ ¤€´ø¹äè(€€€€€€€€€€€™É½´±¥‰ÉÕÍ}…Á¥à¹ÍÑÕ‘•¹Ñ}¥¹™½Éµ…Ñ¥½¸¥µÁ½ÉÐ•Ñ}ÍÑÕ‘•¹Ñ}¥¹™½Éµ…Ñ¥½¸((€€€€€€€€€€€É•ÑÕÉ¸…Ý…¥ÐÍ•±˜¹}ÉÕ¹}‰±½­¥¹œ (€€€€€€€€€€€€€€€•Ñ}ÍÑÕ‘•¹Ñ}¥¹™½Éµ…Ñ¥½¸°Í•±˜¹}±¥•¹Ð(€€€€€€€€€€€€¤((€€€€€€€É•ÑÕÉ¸…Ý…¥ÐÍ•±˜¹}…±±}Ý¥Ñ¡}É•ÑÉä ‰¥¹™½Éµ…©¤¼Õé¹¥Ôˆ°É•ÅÕ•ÍÐ¤((€€€…Íå¹Œ‘•˜…Íå¹}•Ñ}Ñ¥µ•Ñ…‰±” (€€€€€€€Í•±˜°µ½¹‘…å}‘…Ñ•Ìè%Ñ•É…‰±•m‘…Ñ•t(€€€€¤€´ø‘¥ÑmÍÑÈ°¹åtð9½¹”è(€€€€€€€€ˆˆ‰A½‰¥•ÉèÁ±…¸‘±„Á½‘…¹å Ñå½‘¹¤¸ˆˆˆ(€€€€€€€µ½¹‘…åÌ€ôÑÕÁ±”¡µ½¹‘…å}‘…Ñ•Ì¤((€€€€€€€…Íå¹Œ‘•˜É•ÅÕ•ÍÐ ¤€´ø‘¥ÑmÍÑÈ°¹åtè(€€€€€€€€€€€™É½´±¥‰ÉÕÍ}…Á¥à¹Ñ¥µ•Ñ…‰±”¥µÁ½ÉÐ•Ñ}Ñ¥µ•Ñ…‰±”((€€€€€€€€€€€Ý••­Ìè±¥ÍÑm‘¥ÑmÍÑÈ°¹åut€ômt(€€€€€€€€€€€•ÉÉ½ÉÌè±¥ÍÑm‘¥ÑmÍÑÈ°ÍÑÉut€ômt((€€€€€€€€€€€™½Èµ½¹‘…ä¥¸µ½¹‘…åÌè(€€€€€€€€€€€€€€€µ½¹‘…å}‘…Ñ•Ñ¥µ”€ô‘…Ñ•Ñ¥µ”¹½µ‰¥¹”¡µ½¹‘…ä°‘…Ñ•Ñ¥µ”¹µ¥¸¹Ñ¥µ” ¤¤(€€€€€€€€€€€€€€€ÑÉäè(€€€€€€€€€€€€€€€€€€€‘…åÌ€ô…Ý…¥ÐÍ•±˜¹}ÉÕ¹}‰±½­¥¹œ (€€€€€€€€€€€€€€€€€€€€€€€•Ñ}Ñ¥µ•Ñ…‰±”°Í•±˜¹}±¥•¹Ð°µ½¹‘…å}‘…Ñ•Ñ¥µ”(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€•á•ÁÐQ½­•¹ÉÉ½Èè(€€€€€€€€€€€€€€€€€€€É…¥Í”(€€€€€€€€€€€€€€€•á•ÁÐá•ÁÑ¥½¸…Ì•ÉÈè(€€€€€€€€€€€€€€€€€€€‘¥…¹½ÍÑ¥Œ€ôì(€€€€€€€€€€€€€€€€€€€€€€€€‰Ý••­}ÍÑ…ÉÐˆèµ½¹‘…ä¹¥Í½™½Éµ…Ð ¤°(€€€€€€€€€€€€€€€€€€€€€€€€‰•ÉÉ½É}ÑåÁ”ˆèÑåÁ”¡•ÉÈ¤¹}}¹…µ•}|°(€€€€€€€€€€€€€€€€€€€€€€€€‰•ÉÉ½ÈˆèÍÑÈ¡•ÉÈ¤°(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€•ÉÉ½ÉÌ¹…ÁÁ•¹¡‘¥…¹½ÍÑ¥Œ¤(€€€€€€€€€€€€€€€€€€€}1=H¹Ý…É¹¥¹œ (€€€€€€€€€€€€€€€€€€€€€€€€‰9¥”Õ‘‡	¼Í§dÁ½‰É‡Á±…¹Ô‘±„Ñå½‘¹¥„€•Ìè€•Ìˆ°(€€€€€€€€€€€€€€€€€€€€€€€µ½¹‘…ä¹¥Í½™½Éµ…Ð ¤°(€€€€€€€€€€€€€€€€€€€€€€€•ÉÈ°(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€½¹Ñ¥¹Õ”((€€€€€€€€€€€€€€€Ý••­Ì¹…ÁÁ•¹¡ì‰Ý••­}ÍÑ…ÉÐˆèµ½¹‘…ä¹¥Í½™½Éµ…Ð ¤°€‰‘…åÌˆè‘…åÍô¤((€€€€€€€€€€€¥˜¹½ÐÝ••­Ìè(€€€€€€€€€€€€€€€‘•Ñ…¥±Ì€ô€ˆì€ˆ¹©½¥¸ (€€€€€€€€€€€€€€€€€€€˜‰í¥Ñ•µlÝ••­}ÍÑ…ÉÐuôèí¥Ñ•µl•ÉÉ½É}ÑåÁ”uôèí¥Ñ•µl•ÉÉ½Èuôˆ(€€€€€€€€€€€€€€€€€€€™½È¥Ñ•´¥¸•ÉÉ½ÉÌ(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€É…¥Í”IÕ¹Ñ¥µ•ÉÉ½È (€€€€€€€€€€€€€€€€€€€€‰1¥‰ÉÕÌ¹¥”éÝËÍ§Á±…¹Ô‘±„ÍÁÉ…Ý‘é…¹å Ñå½‘¹¤ˆ(€€€€€€€€€€€€€€€€€€€˜ˆ€¡í‘•Ñ…¥±Ì½È€‰É…¬Íéé•ŸÏÍÜô¤ˆ(€€€€€€€€€€€€€€€€¤((€€€€€€€€€€€É•ÑÕÉ¸ì‰Ý••­ÌˆèÝ••­Ì°€‰Ý••­}•ÉÉ½ÉÌˆè•ÉÉ½ÉÍô((€€€€€€€É•ÑÕÉ¸…Ý…¥ÐÍ•±˜¹}…±±}Ý¥Ñ¡}É•ÑÉä (€€€€€€€€€€€€‰Á±…¹Ô±•­©¤ˆ°É•ÅÕ•ÍÐ°É…¥Í•}½¹}™…¥±ÕÉ”õQÉÕ”(€€€€€€€€¤(
+    """SprawdÅº, czy opisowa pozycja jest zwykÅ‚Ä… ocenÄ… liczbowÄ…."""
+    return value.strip() in _GRADE_VALUES
+
+
+def _is_behavior_subject(value: str) -> bool:
+    """Rozpoznaj sekcjÄ™ zachowania w ocenach opisowych Librusa."""
+    normalized = str(value or "").strip().casefold()
+    return any(token in normalized for token in ("zachow", "behaviour", "behavior", "conduct"))
+
+
+_POLISH_FOLD = str.maketrans(
+    {
+        "Ä…": "a",
+        "Ä‡": "c",
+        "Ä™": "e",
+        "Å‚": "l",
+        "Å„": "n",
+        "Ã³": "o",
+        "Å›": "s",
+        "Åº": "z",
+        "Å¼": "z",
+    }
+)
+
+
+def _normalized_label(value: str) -> str:
+    """UproÅ›Ä‡ etykietÄ™ tabeli Librusa bez utraty semantyki pola."""
+    text = str(value or "").casefold().translate(_POLISH_FOLD)
+    return " ".join(text.replace(":", " ").split())
+
+
+def _header_row(table: Tag) -> tuple[list[Tag], Tag | None]:
+    """ZwrÃ³Ä‡ komÃ³rki nagÅ‚Ã³wka i wiersz, aby pÃ³Åºniej go pominÄ…Ä‡."""
+    thead = table.find("thead")
+    if thead is not None:
+        row = thead.find("tr")
+        if row is not None:
+            cells = row.find_all(["th", "td"], recursive=False)
+            if cells:
+                return cells, row
+    for row in table.find_all("tr"):
+        cells = row.find_all(["th", "td"], recursive=False)
+        if cells and any(cell.name == "th" for cell in cells):
+            return cells, row
+    return [], None
+
+
+def _note_table_rows(html: str) -> list[dict[str, str]]:
+    """Parsuj stronÄ™ ``UczeÅ„ â†’ Uwagi``.
+
+    Aktualny ukÅ‚ad Synergii ma kolumny: Uwaga, Data, Kto dodaÅ‚, Rodzaj
+    uwagi i Kategoria. Parser akceptuje teÅ¼ starsze warianty nazw kolumn, ale
+    przy nieznanym ukÅ‚adzie koÅ„czy bÅ‚Ä™dem zamiast udawaÄ‡ pustÄ… listÄ™.
+    """
+    soup = no_access_check(BeautifulSoup(html or "", "lxml"))
+    page_text = _normalized_label(soup.get_text(" ", strip=True))
+    if "brak uwag" in page_text:
+        return []
+
+    field_aliases = {
+        "uwaga": "content",
+        "tresc": "content",
+        "tresc uwagi": "content",
+        "data": "date",
+        "kto dodal": "author",
+        "dodal": "author",
+        "nauczyciel": "author",
+        "rodzaj uwagi": "type",
+        "rodzaj": "type",
+        "kategoria": "category",
+    }
+
+    for table in soup.find_all("table"):
+        header_cells, header_row = _header_row(table)
+        if not header_cells:
+            # W czÄ™Å›ci kont nagÅ‚Ã³wki sÄ… zwykÅ‚ymi td w pierwszym wierszu.
+            first = table.find("tr")
+            candidate = first.find_all(["th", "td"], recursive=False) if first else []
+            candidate_labels = [_normalized_label(cell.get_text(" ", strip=True)) for cell in candidate]
+            if "uwaga" in candidate_labels and "data" in candidate_labels:
+                header_cells, header_row = candidate, first
+        if not header_cells:
+            continue
+
+        fields = [
+            field_aliases.get(_normalized_label(cell.get_text(" ", strip=True)))
+            for cell in header_cells
+        ]
+        if "content" not in fields or "date" not in fields:
+            continue
+
+        rows: list[dict[str, str]] = []
+        for row in table.find_all("tr"):
+            if row is header_row or row.find_parent("table") is not table:
+                continue
+            cells = row.find_all("td", recursive=False)
+            if len(cells) < len(fields):
+                continue
+            record = {
+                field: cells[index].get_text(" ", strip=True)
+                for index, field in enumerate(fields)
+                if field is not None
+            }
+            if record.get("content") or record.get("date"):
+                rows.append(
+                    {
+                        "content": record.get("content", ""),
+                        "date": record.get("date", ""),
+                        "author": record.get("author", ""),
+                        "type": record.get("type", ""),
+                        "category": record.get("category", ""),
+                    }
+                )
+        if rows:
+            return rows
+
+    raise ValueError("Nie rozpoznano ukÅ‚adu strony Uwagi")
+
+
+def _safe_attribute_key(label: str, index: int) -> str:
+    """Zbuduj stabilny klucz atrybutu dla nieudokumentowanej tabeli osiÄ…gniÄ™Ä‡."""
+    normalized = _normalized_label(label)
+    key = re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
+    return key or f"pole_{index + 1}"
+
+
+def _achievement_table_rows(html: str) -> list[dict[str, str]]:
+    """Parsuj ``SzczegÃ³lne osiÄ…gniÄ™cia ucznia``.
+
+    Na koncie bez wpisÃ³w Synergia pokazuje jawny komunikat
+    ``Brak szczegÃ³lnych osiÄ…gniÄ™Ä‡``. Dla przyszÅ‚ych wpisÃ³w obsÅ‚ugujemy typowe
+    dla Synergii tabele kolumnowe oraz tabele par etykietaâ†’wartoÅ›Ä‡. JeÅ¼eli
+    Librus zastosuje inny ukÅ‚ad, zwracamy bÅ‚Ä…d i koordynator zachowa cache.
+    """
+    soup = no_access_check(BeautifulSoup(html or "", "lxml"))
+    page_text = _normalized_label(soup.get_text(" ", strip=True))
+    if "brak szczegolnych osiagniec" in page_text:
+        return []
+
+    for table in soup.select("table.decorated, table.decoratedTable"):
+        header_cells, header_row = _header_row(table)
+        if header_cells:
+            keys = [
+                _safe_attribute_key(cell.get_text(" ", strip=True), index)
+                for index, cell in enumerate(header_cells)
+            ]
+            rows: list[dict[str, str]] = []
+            for row in table.find_all("tr"):
+                if row is header_row or row.find_parent("table") is not table:
+                    continue
+                cells = row.find_all("td", recursive=False)
+                if len(cells) < len(keys):
+                    continue
+                record = {
+                    key: cells[index].get_text(" ", strip=True)
+                    for index, key in enumerate(keys)
+                }
+                if any(record.values()):
+                    rows.append(record)
+            if rows:
+                return rows
+
+        # Starsze ekrany Synergii czÄ™sto zapisujÄ… pojedynczy wpis jako
+        # kolejne wiersze ``etykieta | wartoÅ›Ä‡``.
+        pairs: dict[str, str] = {}
+        for index, row in enumerate(table.find_all("tr")):
+            if row.find_parent("table") is not table:
+                continue
+            cells = row.find_all("td", recursive=False)
+            if len(cells) != 2:
+                continue
+            label = cells[0].get_text(" ", strip=True)
+            value = cells[1].get_text(" ", strip=True)
+            if label and value:
+                pairs[_safe_attribute_key(label, index)] = value
+        if pairs:
+            return [pairs]
+
+    raise ValueError("Nie rozpoznano ukÅ‚adu strony SzczegÃ³lne osiÄ…gniÄ™cia")
+
+
+class LibrusApiClient:
+    """UdostÄ™pnij nieblokujÄ…ce metody uÅ¼ywane przez koordynatory HA."""
+
+    def __init__(self, username: str, password: str) -> None:
+        self.username = username
+        self.password = password
+        self._client: Client | None = None
+        self._token: Any | None = None
+        self._auth_lock = asyncio.Lock()
+        self._request_lock = asyncio.Lock()
+        self._auth_retry_after = 0.0
+
+    async def _run_blocking(self, function: Callable[..., _ResultT], *args: Any) -> _ResultT:
+        """Wykonaj blokujÄ…ce wywoÅ‚anie biblioteki poza pÄ™tlÄ… HA."""
+        async with self._request_lock:
+            return await asyncio.get_running_loop().run_in_executor(
+                None, function, *args
+            )
+
+    def _reset_authentication(self) -> None:
+        self._client = None
+        self._token = None
+        self._auth_retry_after = 0.0
+
+    async def async_authenticate(self) -> bool:
+        """UtwÃ³rz sesjÄ™ i pobierz token Librusa."""
+        loop = asyncio.get_running_loop()
+        if loop.time() < self._auth_retry_after:
+            return False
+
+        async with self._auth_lock:
+            if self._client is not None and self._token is not None:
+                return True
+            if loop.time() < self._auth_retry_after:
+                return False
+            try:
+                client = await self._run_blocking(new_client)
+                token = await self._run_blocking(
+                    client.get_token, self.username, self.password
+                )
+                if not token:
+                    raise ValueError("Librus nie zwrÃ³ciÅ‚ tokenu logowania")
+            except Exception as err:  # biblioteka zgÅ‚asza kilka typÃ³w bÅ‚Ä™dÃ³w sieci
+                self._reset_authentication()
+                self._auth_retry_after = loop.time() + 30
+                _LOGGER.warning("Logowanie do Librusa nie powiodÅ‚o siÄ™: %s", err)
+                return False
+
+            self._client = client
+            self._token = token
+            self._auth_retry_after = 0.0
+            return True
+
+    async def _call_with_retry(
+        self,
+        label: str,
+        operation: Callable[[], Awaitable[_ResultT]],
+        *,
+        raise_on_failure: bool = False,
+    ) -> _ResultT | None:
+        """PonÃ³w wywoÅ‚anie raz po wygaÅ›niÄ™ciu sesji lub bÅ‚Ä™dzie poÅ‚Ä…czenia."""
+        for attempt in range(2):
+            if not await self.async_authenticate():
+                if raise_on_failure:
+                    raise RuntimeError("Nie udaÅ‚o siÄ™ zalogowaÄ‡ do Librusa")
+                return None
+
+            try:
+                return await operation()
+            except TokenError as err:
+                self._reset_authentication()
+                if attempt == 0:
+                    _LOGGER.info("Sesja Librusa wygasÅ‚a; ponawiam: %s", label)
+                    continue
+                if raise_on_failure:
+                    raise RuntimeError(f"Nie udaÅ‚o siÄ™ pobraÄ‡: {label}") from err
+                _LOGGER.warning("Nie udaÅ‚o siÄ™ pobraÄ‡ %s po ponownym logowaniu", label)
+                return None
+            except Exception as err:  # odpowiedzi librus-apix nie majÄ… wspÃ³lnej bazy
+                self._reset_authentication()
+                if attempt == 0:
+                    _LOGGER.warning("BÅ‚Ä…d pobierania %s; ponawiam: %s", label, err)
+                    continue
+                _LOGGER.exception("Nie udaÅ‚o siÄ™ pobraÄ‡: %s", label)
+                if raise_on_failure:
+                    raise RuntimeError(f"Nie udaÅ‚o siÄ™ pobraÄ‡: {label}") from err
+                return None
+
+        return None
+
+    async def async_get_grades(self) -> list[dict[str, Any]] | None:
+        """Pobierz oceny z bieÅ¼Ä…cego semestru."""
+
+        async def request() -> list[dict[str, Any]]:
+            from librus_apix.grades import get_grades
+
+            numeric, _, descriptive = await self._run_blocking(
+                get_grades, self._client, "all"
+            )
+            semester = current_semester()
+            result: list[dict[str, Any]] = []
+
+            for subject_grades in numeric or []:
+                for subject, grades in subject_grades.items():
+                    for grade in grades:
+                        if grade.semester != semester:
+                            continue
+                        # Librus pokazuje bieÅ¼Ä…ce wpisy zachowania w tej samej
+                        # tabeli co zwykÅ‚e oceny i potrafi zwracaÄ‡ wÅ‚asne kody
+                        # (np. ``3bb``). Nie prÃ³bujemy ich interpretowaÄ‡ ani
+                        # traktowaÄ‡ jak oceny liczbowe â€” zachowujemy wartoÅ›Ä‡ 1:1.
+                        entry_type = (
+                            "behavior_current"
+                            if _is_behavior_subject(subject)
+                            else "numeric"
+                        )
+                        result.append(
+                            {
+                                "subject": subject,
+                                "grade": grade.grade,
+                                "date": grade.date,
+                                "category": grade.category,
+                                "comment": _grade_comment(grade),
+                                "teacher": getattr(grade, "teacher", ""),
+                                "semester": grade.semester,
+                                "type": entry_type,
+                            }
+                        )
+
+            for subject_grades in descriptive or []:
+                for subject, grades in subject_grades.items():
+                    for grade in grades:
+                        value = str(grade.grade or "").strip()
+                        if grade.semester != semester:
+                            continue
+                        description = str(getattr(grade, "desc", "") or "")
+                        title = str(getattr(grade, "title", "") or subject or "").strip()
+
+                        # Zachowanie w Librusie jest zwracane przez librus-apix
+                        # wÅ›rÃ³d ocen opisowych. WartoÅ›ci takie jak â€žwzoroweâ€
+                        # nie przechodzÄ… filtra zwykÅ‚ych ocen 1â€“6, dlatego
+                        # zachowujemy je jako osobny typ rekordu.
+                        if _is_behavior_subject(subject) or _is_behavior_subject(title):
+                            result.append(
+                                {
+                                    "subject": subject or title or "Zachowanie",
+                                    "grade": value,
+                                    "date": str(getattr(grade, "date", "") or ""),
+                                    "category": title if title != subject else "",
+                                    "comment": description,
+                                    "teacher": getattr(grade, "teacher", ""),
+                                    "semester": grade.semester,
+                                    "type": "behavior",
+                                }
+                            )
+                            continue
+
+                        if not _is_grade(value):
+                            continue
+
+                        result.append(
+                            {
+                                "subject": subject,
+                                "grade": value,
+                                "date": grade.date,
+                                "category": description.splitlines()[0]
+                                if description
+                                else "",
+                                "comment": description,
+                                "teacher": getattr(grade, "teacher", ""),
+                                "semester": grade.semester,
+                                "type": "descriptive",
+                            }
+                        )
+
+            return result
+
+        return await self._call_with_retry("ocen", request)
+
+    async def async_get_current_behavior(self) -> list[dict[str, Any]] | None:
+        """Pobierz bieÅ¼Ä…ce wpisy z dedykowanej tabeli ``Zachowanie``.
+
+        ``librus-apix`` nie mapuje tej tabeli w stabilny sposÃ³b, dlatego
+        czytamy jÄ… bezpoÅ›rednio ze strony ocen. Znacznik ``K`` jest tylko
+        informacjÄ… o istnieniu komentarza; jeÅ›li wystÄ™puje, otwieramy ten sam
+        endpoint komentarza co interfejs Librusa i zapisujemy jego treÅ›Ä‡.
+        """
+
+        async def request() -> list[dict[str, Any]]:
+            def fetch_grades_page():
+                return self._client.post(
+                    self._client.GRADES_URL,
+                    data={"zmiany_logowanie_wszystkie": "1"},
+                )
+
+            response = await self._run_blocking(fetch_grades_page)
+            rows = _behavior_table_rows(response.text)
+            comment_cache: dict[str, str] = {}
+            for row in rows:
+                path = str(row.pop("comment_path", "") or "")
+                if not path or row.get("comment"):
+                    continue
+                if path not in comment_cache:
+                    popup = await self._run_blocking(
+                        self._client.get, self._client.BASE_URL + path
+                    )
+                    no_access_check(BeautifulSoup(popup.text, "lxml"))
+                    comment_cache[path] = _popup_comment_text(popup.text)
+                row["comment"] = comment_cache[path]
+            return rows
+
+        return await self._call_with_retry("bieÅ¼Ä…cego zachowania", request)
+
+    async def async_get_notes(self) -> list[dict[str, str]] | None:
+        """Pobierz wpisy z menu ``UczeÅ„ â†’ Uwagi``."""
+
+        async def request() -> list[dict[str, str]]:
+            response = await self._run_blocking(
+                self._client.get, self._client.BASE_URL + "/uwagi"
+            )
+            return _note_table_rows(response.text)
+
+        return await self._call_with_retry("uwag", request)
+
+    async def async_get_special_achievements(self) -> list[dict[str, str]] | None:
+        """Pobierz stronÄ™ ``UczeÅ„ â†’ SzczegÃ³lne osiÄ…gniÄ™cia``."""
+
+        async def request() -> list[dict[str, str]]:
+            response = await self._run_blocking(
+                self._client.get,
+                self._client.BASE_URL + "/szczegolne_osiagniecia_ucznia",
+            )
+            return _achievement_table_rows(response.text)
+
+        return await self._call_with_retry("szczegÃ³lnych osiÄ…gniÄ™Ä‡", request)
+
+    async def async_get_messages(
+        self, count: int = 10
+    ) -> list[dict[str, Any]] | None:
+        """Pobierz nagÅ‚Ã³wki wiadomoÅ›ci bez otwierania ich treÅ›ci."""
+
+        async def request() -> list[dict[str, Any]]:
+            from librus_apix.messages import get_received
+
+            messages = await self._run_blocking(get_received, self._client, 0)
+            return [
+                {
+                    "author": message.author,
+                    "title": message.title,
+                    "date": message.date,
+                    "href": message.href,
+                    "unread": message.unread,
+                    "has_attachment": message.has_attachment,
+                }
+                for message in (messages or [])[:count]
+            ]
+
+        return await self._call_with_retry("wiadomoÅ›ci", request)
+
+    async def async_get_message_content(self, href: str) -> dict[str, str] | None:
+        """Pobierz treÅ›Ä‡ jednej wiadomoÅ›ci wskazanej przez uÅ¼ytkownika."""
+        if not href:
+            return None
+
+        async def request() -> dict[str, str] | None:
+            from librus_apix.messages import message_content
+
+            message = await self._run_blocking(
+                message_content, self._client, href
+            )
+            if message is None:
+                return None
+            return {
+                "author": str(getattr(message, "author", "") or "").strip(),
+                "title": str(getattr(message, "title", "") or "").strip(),
+                "content": str(getattr(message, "content", "") or "").strip(),
+                "date": str(getattr(message, "date", "") or "").strip(),
+            }
+
+        return await self._call_with_retry("treÅ›ci wiadomoÅ›ci", request)
+
+    async def async_get_homework(self) -> list[Any] | None:
+        """Pobierz zadania z najbliÅ¼szych 30 dni."""
+
+        async def request() -> list[Any]:
+            from librus_apix.homework import get_homework
+
+            today = date.today()
+            return await self._run_blocking(
+                get_homework,
+                self._client,
+                today.strftime("%Y-%m-%d"),
+                (today + timedelta(days=30)).strftime("%Y-%m-%d"),
+            )
+
+        return await self._call_with_retry("zadaÅ„", request)
+
+    async def async_get_attendance(self) -> list[dict[str, Any]] | None:
+        """Pobierz wpisy frekwencji ze wszystkich zwrÃ³conych semestrÃ³w."""
+
+        async def request() -> list[dict[str, Any]]:
+            from librus_apix.attendance import get_attendance
+
+            semesters = await self._run_blocking(
+                get_attendance, self._client
+            )
+            result: list[dict[str, Any]] = []
+            for semester in semesters or []:
+                for entry in semester or []:
+                    result.append(
+                        {
+                            "symbol": str(getattr(entry, "symbol", "") or ""),
+                            "typ": str(getattr(entry, "type", "") or ""),
+                            "data": str(getattr(entry, "date", "") or ""),
+                            "przedmiot": str(
+                                getattr(entry, "subject", "") or ""
+                            ),
+                            "nauczyciel": str(
+                                getattr(entry, "teacher", "") or ""
+                            ),
+                            "godzina": getattr(entry, "period", None),
+                        }
+                    )
+            return result
+
+        return await self._call_with_retry("frekwencji", request)
+
+    async def async_get_announcements(self) -> list[dict[str, str]] | None:
+        """Pobierz ogÅ‚oszenia szkolne."""
+
+        async def request() -> list[dict[str, str]]:
+            from librus_apix.announcements import get_announcements
+
+            announcements = await self._run_blocking(
+                get_announcements, self._client
+            )
+            return [
+                {
+                    "tytul": str(
+                        getattr(announcement, "title", "") or ""
+                    ),
+                    "nadawca": str(
+                        getattr(announcement, "author", "") or ""
+                    ),
+                    "opis": str(
+                        getattr(announcement, "description", "") or ""
+                    ),
+                    "data": str(
+                        getattr(announcement, "date", "") or ""
+                    ),
+                }
+                for announcement in announcements or []
+            ]
+
+        return await self._call_with_retry("ogÅ‚oszeÅ„", request)
+
+    @staticmethod
+    def _fetch_schedule(client: Client, today: date) -> list[dict[str, Any]]:
+        """Pobierz bieÅ¼Ä…cy i nastÄ™pny miesiÄ…c terminarza."""
+        from librus_apix.schedule import get_schedule
+
+        months = [
+            (today.year, today.month),
+            (
+                today.year + 1 if today.month == 12 else today.year,
+                1 if today.month == 12 else today.month + 1,
+            ),
+        ]
+        events: list[dict[str, Any]] = []
+        for year, month in months:
+            monthly = get_schedule(client, f"{month:02d}", str(year)) or {}
+            for day_number, day_events in monthly.items():
+                event_date = date(year, month, int(day_number))
+                if event_date < today:
+                    continue
+                for event in day_events:
+                    events.append(
+                        {
+                            "data": event_date.isoformat(),
+                            "tydzien": event_date.strftime("%A"),
+                            "tytul": event.title,
+                            "przedmiot": event.subject,
+                            "godzina": event.hour,
+                            "numer_lekcji": event.number,
+                            "szczegoly": event.data,
+                            "href": event.href,
+                        }
+                    )
+        return sorted(events, key=lambda item: item["data"])
+
+    async def async_get_schedule(self) -> list[dict[str, Any]] | None:
+        """Pobierz nadchodzÄ…ce wpisy terminarza."""
+
+        async def request() -> list[dict[str, Any]]:
+            return await self._run_blocking(
+                self._fetch_schedule, self._client, date.today()
+            )
+
+        return await self._call_with_retry("terminarza", request)
+
+    async def async_get_schedule_content(
+        self, href: str
+    ) -> dict[str, str] | None:
+        """Pobierz peÅ‚ne szczegÃ³Å‚y jednego wpisu terminarza."""
+        if not href or "/" not in href:
+            return None
+
+        prefix, detail_url = href.split("/", 1)
+        if not prefix or not detail_url:
+            return None
+
+        async def request() -> dict[str, str] | None:
+            from librus_apix.schedule import schedule_detail
+
+            details = await self._run_blocking(
+                schedule_detail, self._client, prefix, detail_url
+            )
+            if details is None:
+                return None
+            return {
+                str(key).strip(): str(value or "").strip()
+                for key, value in details.items()
+            }
+
+        return await self._call_with_retry("treÅ›ci wpisu terminarza", request)
+
+    async def async_get_student_information(self) -> Any | None:
+        """Pobierz podstawowe informacje o uczniu."""
+
+        async def request() -> Any:
+            from librus_apix.student_information import get_student_information
+
+            return await self._run_blocking(
+                get_student_information, self._client
+            )
+
+        return await self._call_with_retry("informacji o uczniu", request)
+
+    async def async_get_timetable(
+        self, monday_dates: Iterable[date]
+    ) -> dict[str, Any] | None:
+        """Pobierz plan dla podanych tygodni."""
+        mondays = tuple(monday_dates)
+
+        async def request() -> dict[str, Any]:
+            from librus_apix.timetable import get_timetable
+
+            weeks: list[dict[str, Any]] = []
+            errors: list[dict[str, str]] = []
+
+            for monday in mondays:
+                monday_datetime = datetime.combine(monday, datetime.min.time())
+                try:
+                    days = await self._run_blocking(
+                        get_timetable, self._client, monday_datetime
+                    )
+                except TokenError:
+                    raise
+                except Exception as err:
+                    diagnostic = {
+                        "week_start": monday.isoformat(),
+                        "error_type": type(err).__name__,
+                        "error": str(err),
+                    }
+                    errors.append(diagnostic)
+                    _LOGGER.warning(
+                        "Nie udaÅ‚o siÄ™ pobraÄ‡ planu dla tygodnia %s: %s",
+                        monday.isoformat(),
+                        err,
+                    )
+                    continue
+
+                weeks.append({"week_start": monday.isoformat(), "days": days})
+
+            if not weeks:
+                details = "; ".join(
+                    f"{item['week_start']}: {item['error_type']}: {item['error']}"
+                    for item in errors
+                )
+                raise RuntimeError(
+                    "Librus nie zwrÃ³ciÅ‚ planu dla sprawdzanych tygodni"
+                    f" ({details or 'brak szczegÃ³Å‚Ã³w'})"
+                )
+
+            return {"weeks": weeks, "week_errors": errors}
+
+        return await self._call_with_retry(
+            "planu lekcji", request, raise_on_failure=True
+        )
