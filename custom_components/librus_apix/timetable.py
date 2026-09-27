@@ -1,0 +1,276 @@
+"""Czysta logika normalizacji planu lekcji Librus.
+
+Modul nie zalezy od Home Assistanta. Dzieki temu parser i reguly wyboru
+pierwszej lekcji mozna testowac bez uruchamiania calej instancji HA.
+"""
+
+from __future__ import annotations
+
+import unicodedata
+from collections.abc import Iterable, Mapping, Sequence
+from datetime import date, datetime, timedelta
+from typing import Any
+
+WEEKDAYS_PL = (
+    "poniedzialek",
+    "wtorek",
+    "sroda",
+    "czwartek",
+    "piatek",
+    "sobota",
+    "niedziela",
+)
+
+_CANCELLED_MARKERS = (
+    "odwol",
+    "anulow",
+    "nie odbedzie",
+    "lekcja usunieta",
+    "zajecia usuniete",
+)
+
+_CHANGED_MARKERS = (
+    "zastep",
+    "zmian",
+    "przenies",
+)
+
+
+def monday_for(value: date) -> date:
+    """Zwroc poniedzialek tygodnia zawierajacego date."""
+    return value - timedelta(days=value.weekday())
+
+
+def weeks_to_fetch(value: date) -> list[date]:
+    """Zwroc poczatki biezacego i nastepnego tygodnia."""
+    current = monday_for(value)
+    return [current, current + timedelta(days=7)]
+
+
+def _get(period: Any, key: str, default: Any = "") -> Any:
+    """Odczytaj pole z obiektu dataclass albo slownika."""
+    if isinstance(period, Mapping):
+        return period.get(key, default)
+    return getattr(period, key, default)
+
+
+def _json_safe(value: Any) -> Any:
+    """Zamien wartosc na typ bezpieczny dla atrybutow i Store HA."""
+    if isinstance(value, Mapping):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
+
+
+def _plain_text(value: Any) -> str:
+    """Splaszcz strukture i usun polskie znaki do porownan statusu."""
+    if isinstance(value, Mapping):
+        text = " ".join(
+            f"{_plain_text(key)} {_plain_text(item)}" for key, item in value.items()
+        )
+    elif isinstance(value, (list, tuple, set)):
+        text = " ".join(_plain_text(item) for item in value)
+    else:
+        text = str(value or "")
+    # NFKD rozklada większość polskich znaków, ale nie literę ł/Ł.
+    # Bez tej zamiany np. "odwołana" stawała się "odwoana" i marker
+    # odwołanej lekcji nie był wykrywany.
+    text = text.replace("ł", "l").replace("Ł", "L")
+    return (
+        unicodedata.normalize("NFKD", text)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+        .lower()
+        .strip()
+    )
+
+
+def _replacement_fields(info: Mapping[str, Any]) -> dict[str, str]:
+    """Wyciagnij dane zastępstwa zapisane przez librus-apix."""
+    result = {
+        "subject_swap": "",
+        "teacher_swap": "",
+        "classroom_swap": "",
+        "date_added": "",
+    }
+    for value in info.values():
+        if not isinstance(value, Mapping):
+            continue
+        for key in result:
+            candidate = value.get(key)
+            if candidate not in (None, ""):
+                result[key] = str(candidate).strip()
+    return result
+
+
+def normalize_period(period: Any, week_start: str = "") -> dict[str, Any] | None:
+    """Zamien obiekt Period biblioteki na stabilny slownik integracji."""
+    lesson_date = str(_get(period, "date", "")).strip()
+    start = str(_get(period, "date_from", "")).strip()
+    end = str(_get(period, "date_to", "")).strip()
+    original_subject = str(_get(period, "subject", "")).strip()
+    teacher_and_classroom = str(_get(period, "teacher_and_classroom", "")).strip()
+
+    try:
+        parsed_date = date.fromisoformat(lesson_date)
+    except ValueError:
+        return None
+
+    # Biblioteka zwraca rowniez sobote i niedziele. Integracja szkolna celowo
+    # ich nie publikuje i nie uzywa do budzika.
+    if parsed_date.weekday() >= 5:
+        return None
+
+    raw_info = _get(period, "info", {})
+    info = _json_safe(raw_info if isinstance(raw_info, Mapping) else {})
+    replacements = _replacement_fields(info)
+    info_text = _plain_text(info)
+    cancelled = any(marker in info_text for marker in _CANCELLED_MARKERS)
+    changed = bool(
+        replacements["subject_swap"]
+        or replacements["teacher_swap"]
+        or replacements["classroom_swap"]
+        or any(marker in info_text for marker in _CHANGED_MARKERS)
+    )
+
+    subject = replacements["subject_swap"] or original_subject
+    teacher = replacements["teacher_swap"] or teacher_and_classroom
+    room = replacements["classroom_swap"]
+    number_raw = _get(period, "number", 0)
+    try:
+        number = int(number_raw)
+    except (TypeError, ValueError):
+        number = 0
+
+    # Puste komorki tabeli nie sa lekcjami. Zachowujemy odwolane lekcje tylko
+    # wtedy, gdy Librus nadal podaje ich przedmiot.
+    if not subject:
+        return None
+
+    status = "cancelled" if cancelled else ("changed" if changed else "active")
+    lesson_key = f"{lesson_date}|{number}|{start}"
+
+    return {
+        "lesson_key": lesson_key,
+        "week_start": week_start or monday_for(parsed_date).isoformat(),
+        "date": lesson_date,
+        "weekday": WEEKDAYS_PL[parsed_date.weekday()],
+        "number": number,
+        "start": start,
+        "end": end,
+        "time": f"{start}-{end}" if start and end else start,
+        "subject": subject,
+        "original_subject": original_subject,
+        "teacher": teacher,
+        "room": room,
+        "teacher_and_classroom": teacher_and_classroom,
+        "status": status,
+        "active": not cancelled,
+        "cancelled": cancelled,
+        "changed": changed,
+        "info": info,
+        "replacement": replacements,
+    }
+
+
+def normalize_timetable(raw_weeks: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Znormalizuj dwa tygodnie i usun ewentualne duplikaty."""
+    deduplicated: dict[str, dict[str, Any]] = {}
+    for week in raw_weeks:
+        week_start = str(week.get("week_start", ""))
+        days = week.get("days", [])
+        if not isinstance(days, Sequence):
+            continue
+        for periods in days:
+            if not isinstance(periods, Sequence):
+                continue
+            for period in periods:
+                lesson = normalize_period(period, week_start)
+                if lesson is not None:
+                    deduplicated[lesson["lesson_key"]] = lesson
+    return sorted(
+        deduplicated.values(),
+        key=lambda item: (item["date"], item["start"], item["number"]),
+    )
+
+
+def active_lessons(lessons: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Zwroc tylko aktywne lekcje."""
+    return [dict(lesson) for lesson in lessons if lesson.get("active", False)]
+
+
+def lessons_for_date(
+    lessons: Iterable[Mapping[str, Any]], target: date, *, active_only: bool = False
+) -> list[dict[str, Any]]:
+    """Zwroc lekcje z jednego dnia."""
+    result = [
+        dict(lesson)
+        for lesson in lessons
+        if lesson.get("date") == target.isoformat()
+        and (not active_only or lesson.get("active", False))
+    ]
+    return sorted(
+        result, key=lambda item: (item.get("start", ""), item.get("number", 0))
+    )
+
+
+def first_active_lesson(
+    lessons: Iterable[Mapping[str, Any]], target: date
+) -> dict[str, Any] | None:
+    """Zwroc pierwsza aktywna lekcje danego dnia."""
+    day = lessons_for_date(lessons, target, active_only=True)
+    return day[0] if day else None
+
+
+def next_active_lesson(
+    lessons: Iterable[Mapping[str, Any]], now: datetime
+) -> dict[str, Any] | None:
+    """Zwroc najblizsza aktywna lekcje, ktora jeszcze sie nie skonczyla."""
+    candidates: list[tuple[datetime, dict[str, Any]]] = []
+    for lesson in active_lessons(lessons):
+        try:
+            end = datetime.fromisoformat(f"{lesson['date']}T{lesson['end']}")
+            start = datetime.fromisoformat(f"{lesson['date']}T{lesson['start']}")
+        except (KeyError, TypeError, ValueError):
+            continue
+        comparison_now = now.replace(tzinfo=None) if now.tzinfo else now
+        if end > comparison_now:
+            candidates.append((start, lesson))
+    return min(candidates, key=lambda item: item[0])[1] if candidates else None
+
+
+def timetable_hours(lessons: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, str]]:
+    """Zbuduj czytelna mape numerow i godzin lekcji."""
+    result: dict[str, dict[str, str]] = {}
+    for lesson in sorted(lessons, key=lambda item: item.get("number", 0)):
+        number = str(lesson.get("number", 0))
+        if number == "0" or number in result:
+            continue
+        start = str(lesson.get("start", ""))
+        end = str(lesson.get("end", ""))
+        result[number] = {
+            "start": start,
+            "end": end,
+            "time": f"{start}-{end}" if start and end else start,
+        }
+    return result
+
+
+def lessons_by_date(
+    lessons: Iterable[Mapping[str, Any]], *, active_only: bool = False
+) -> dict[str, list[dict[str, Any]]]:
+    """Pogrupuj lekcje wedlug daty."""
+    result: dict[str, list[dict[str, Any]]] = {}
+    for lesson in lessons:
+        if active_only and not lesson.get("active", False):
+            continue
+        key = str(lesson.get("date", ""))
+        if not key:
+            continue
+        result.setdefault(key, []).append(dict(lesson))
+    for day in result.values():
+        day.sort(key=lambda item: (item.get("start", ""), item.get("number", 0)))
+    return result
