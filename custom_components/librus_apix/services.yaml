@@ -1,0 +1,44 @@
+pobierz_tresc_wiadomosci:
+  name: Pobierz treść wiadomości
+  description: >-
+    Otwiera jedną z pięciu ostatnich wiadomości widocznych w sensorze Librusa
+    i udostępnia jej pełną treść w atrybucie wybrana_wiadomosc.
+  target:
+    entity:
+      integration: librus_apix
+      domain: sensor
+  fields:
+    indeks:
+      name: Numer wiadomości
+      description: Pozycja wiadomości na liście, liczona od zera.
+      required: true
+      example: 0
+      selector:
+        number:
+          min: 0
+          max: 4
+          step: 1
+          mode: box
+
+pobierz_tresc_terminarza:
+  name: Pokaż treść wpisu terminarza
+  description: >-
+    Wybiera jeden z pięciu najbliższych wpisów widocznych w sensorze terminarza
+    i udostępnia jego szczegóły oraz treść nauczyciela w atrybucie
+    wybrane_zdarzenie.
+  target:
+    entity:
+      integration: librus_apix
+      domain: sensor
+  fields:
+    indeks:
+      name: Numer wydarzenia
+      description: Pozycja wydarzenia na liście, liczona od zera.
+      required: true
+      example: 0
+      selector:
+        number:
+          min: 0
+          max: 4
+          step: 1
+          mode: box
