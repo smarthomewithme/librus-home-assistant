@@ -1009,6 +1009,25 @@ class LibrusPlanLekcjiSensor(
     _attr_name = "Plan lekcji"
     _attr_icon = "mdi:timetable"
 
+    # Pełny plan pozostaje dostępny jako bieżące atrybuty encji dla dashboardu,
+    # automatyzacji i Node-RED, ale nie powinien być kopiowany do każdej próbki
+    # historii. Zapisujemy tylko lekkie wskaźniki i znaczniki czasu.
+    _unrecorded_attributes = frozenset(
+        {
+            "tygodnie",
+            "tygodnie_sprawdzane",
+            "bledy_tygodni",
+            "pierwsza_lekcja_dzis",
+            "pierwsza_lekcja_jutro",
+            "nastepna_lekcja",
+            "lekcje_dzis",
+            "lekcje_jutro",
+            "lekcje_wg_daty",
+            "aktywne_lekcje_wg_daty",
+            "godziny_lekcji",
+        }
+    )
+
     def __init__(
         self,
         coordinator: LibrusTimetableCoordinator,
