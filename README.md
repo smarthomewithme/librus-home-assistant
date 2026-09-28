@@ -1,7 +1,7 @@
 # Librus Synergia — Smart Home With Me
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-custom%20integration-41BDF5)](https://www.home-assistant.io/)
-![Version](https://img.shields.io/badge/version-1.6.1-blue)
+![Version](https://img.shields.io/badge/version-1.6.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 Unofficial **Librus Synergia integration for Home Assistant**, developed and maintained by **Smart Home With Me**.
@@ -47,7 +47,7 @@ Then restart Home Assistant and add the integration from **Settings → Devices 
 
 ## What the integration can do
 
-Version **1.6.1** turns Librus into a complete school-data source for Home Assistant rather than a simple grade sensor.
+Version **1.6.2** turns Librus into a complete school-data source for Home Assistant rather than a simple grade sensor.
 
 ### Student information
 
@@ -351,7 +351,7 @@ The integration runs inside your Home Assistant instance.
 
 ## Version
 
-Current stable version: **1.6.1**
+Current stable version: **1.6.2**
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete development history.
 
