@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.2
+
+- Fixed Home Assistant Recorder warnings when timetable sensor attributes exceed the 16 KiB history-storage limit.
+- Full timetable structures remain available live to dashboards, automations and Node-RED, but heavy timetable attributes are no longer duplicated into every Recorder history row.
+- Lightweight timetable status, lesson counts and start timestamps continue to be recorded normally.
+- No entity IDs, unique IDs or dashboard-facing attribute names were changed.
+
 ## 1.6.1
 
 - Added a dedicated **Notes** sensor from `Student → Notes`; state is the number of entries and attributes preserve note text, date, author, note type and category as separate fields.
