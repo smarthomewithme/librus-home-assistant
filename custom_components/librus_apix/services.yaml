@@ -42,3 +42,42 @@ pobierz_tresc_terminarza:
           max: 4
           step: 1
           mode: box
+
+potwierdz_odczytanie:
+  name: Potwierdź odczytanie
+  description: >-
+    Trwale zapamiętuje odczytanie danych Librusa wewnątrz integracji, bez
+    helperów input_text. Obsługuje oceny, terminarz, wiadomości, zadania,
+    zachowanie oraz uwagi.
+  target:
+    entity:
+      integration: librus_apix
+      domain: sensor
+  fields:
+    kategoria:
+      name: Kategoria
+      description: Rodzaj danych, które mają zostać oznaczone jako odczytane.
+      required: true
+      selector:
+        select:
+          options:
+            - oceny
+            - terminarz
+            - wiadomosci
+            - zadania
+            - zachowanie
+            - uwagi
+    indeks:
+      name: Indeks pozycji
+      description: >-
+        Opcjonalny numer pozycji liczony od zera. Bez indeksu oceny, zadania
+        i zachowanie są potwierdzane zbiorczo. Dla wiadomości i terminarza
+        bez indeksu używana jest aktualnie otwarta pozycja.
+      required: false
+      example: 0
+      selector:
+        number:
+          min: 0
+          max: 99
+          step: 1
+          mode: box
