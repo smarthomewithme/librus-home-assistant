@@ -1,7 +1,7 @@
 # Librus Synergia — Smart Home With Me
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-custom%20integration-41BDF5)](https://www.home-assistant.io/)
-![Version](https://img.shields.io/badge/version-1.6.2-blue)
+![Version](https://img.shields.io/badge/version-1.7.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 Unofficial **Librus Synergia integration for Home Assistant**, developed and maintained by **Smart Home With Me**.
@@ -20,8 +20,7 @@ If the button does not open automatically:
 
 1. Open **HACS → Integrations**.
 2. Open the menu in the top-right corner and choose **Custom repositories**.
-3. Add:
-   `https://github.com/smarthomewithme/librus-home-assistant`
+3. Add `https://github.com/smarthomewithme/librus-home-assistant`.
 4. Select category **Integration**.
 5. Install **Librus Synergia — Smart Home With Me**.
 6. Restart Home Assistant.
@@ -29,36 +28,41 @@ If the button does not open automatically:
 
 ### Manual installation
 
-Copy the folder:
-
-```text
-custom_components/librus_apix
-```
-
-into:
-
-```text
-/config/custom_components/librus_apix
-```
-
-Then restart Home Assistant and add the integration from **Settings → Devices & services**.
+Copy `custom_components/librus_apix` into `/config/custom_components/librus_apix`, then restart Home Assistant and add the integration from **Settings → Devices & services**.
 
 ---
 
 ## What the integration can do
 
-Version **1.6.2** turns Librus into a complete school-data source for Home Assistant rather than a simple grade sensor.
+Version **1.7.0** turns Librus into a complete school-data source for Home Assistant rather than a simple grade sensor.
 
-### Student information
+### Persistent read state — added in v1.7.0
 
-- student name,
-- class,
-- class register number,
-- homeroom teacher,
-- school,
-- lucky number.
+The integration can now remember which dashboard items have already been acknowledged **without any `input_text` helper**.
 
-The integration intentionally does **not** copy account credentials or sections such as *My Account* / *Student Account* into entities or cache.
+Supported categories:
+
+- grades,
+- messages,
+- school calendar entries,
+- homework,
+- current behaviour entries,
+- notes.
+
+Read state is stored separately for every configured student account and survives Home Assistant restarts. Existing grades, calendar entries, homework, behaviour entries and notes are used as the initial read baseline after upgrading, so old data does not suddenly appear as new.
+
+Use the action:
+
+```yaml
+action: librus_apix.potwierdz_odczytanie
+data:
+  entity_id: sensor.librus_student_oceny
+  kategoria: oceny
+```
+
+For a single list item, pass `indeks`. Messages and school-calendar entries can also use the item currently selected by their existing detail actions.
+
+Each supported item exposes a stable local `id` plus `odczytana` / `nieodczytana` where applicable. The older `jest_nowa` / `jest_nowy` flags remain available for compatibility, but for acknowledged categories they now follow persistent unread state rather than the old “today or yesterday” window.
 
 ### Grades
 
@@ -71,53 +75,37 @@ The integration intentionally does **not** copy account credentials or sections 
 - dynamic subject sensors,
 - new subjects can appear without restarting Home Assistant.
 
+Version 1.7.0 also preserves the Librus grade-detail link. Non-standard grade markers such as `T` can therefore be resolved through the grade detail page instead of being shown as an unexplained letter. For point-based diagnostic tests the integration keeps the raw marker and exposes the point breakdown, with a compact display such as `T · 15/21 pkt` when Librus provides `Suma punktów`.
+
 Behaviour values are kept separate from normal grades and are not included in grade averages.
+
+### Student information
+
+- student name,
+- class,
+- class register number,
+- homeroom teacher,
+- school,
+- lucky number.
+
+The integration intentionally does **not** copy account credentials or sections such as *My Account* / *Student Account* into entities or cache.
 
 ### Behaviour
 
 The integration separates two different Librus concepts:
 
-- **Classification behaviour** — semester/year evaluation such as `excellent` / `very good` depending on the school wording,
+- **Classification behaviour** — semester/year evaluation,
 - **Current behaviour entries** — live entries visible under the Behaviour subject.
 
-Current behaviour entries preserve:
+Current behaviour entries preserve the original school code/value, category, date, teacher, semester and the actual teacher comment. The technical Librus `K` marker is treated only as an indicator that a comment exists; the integration fetches the real comment text separately.
 
-- original school code/value,
-- category,
-- date,
-- teacher,
-- semester,
-- actual teacher comment.
+### Notes
 
-The technical Librus `K` marker is treated only as an indicator that a comment exists. The integration fetches the real comment text separately.
+Dedicated **Notes** sensor from **Student → Notes** with note text, date, author, note type and category. Also included are a **New Notes** binary sensor and the `librus_apix_nowa_uwaga` event.
 
-### Notes — added in v1.6.1
+### Special achievements
 
-Dedicated **Notes** sensor from **Student → Notes** with:
-
-- note text,
-- date,
-- author,
-- note type,
-- category.
-
-Also included:
-
-- **New Notes** binary sensor,
-- `librus_apix_nowa_uwaga` Home Assistant event,
-- baseline protection after restart so old notes do not generate a flood of false notifications.
-
-### Special achievements — added in v1.6.1
-
-Dedicated **Special achievements** sensor from the Librus student section.
-
-- explicit *no achievements* page correctly returns `0`,
-- common column-table layouts are supported,
-- label/value layouts are supported,
-- an unknown future HTML layout keeps the previous cached value instead of reporting a false zero,
-- new entries can trigger `librus_apix_nowe_szczegolne_osiagniecie`.
-
-> Real empty-state behaviour has been verified. A real non-empty achievement entry has not yet been available on the test account, so that parser remains intentionally defensive.
+Dedicated **Special achievements** sensor from the Librus student section. Explicit empty-state pages return `0`; common table layouts are supported and an unknown future layout keeps the previous cached value instead of reporting a false zero. New entries can trigger `librus_apix_nowe_szczegolne_osiagniecie`.
 
 ### Messages
 
@@ -137,7 +125,7 @@ data:
   indeks: 0
 ```
 
-Opening the full content may mark the message as read in Librus.
+Opening the full content may mark the message as read in Librus. Version 1.7.0 also allows an explicit local acknowledgement to remain remembered if Librus updates its unread flag with a delay.
 
 ### Homework
 
@@ -183,18 +171,15 @@ data:
 
 ### Timetable
 
-- current week,
-- next week,
-- classroom,
-- teacher,
-- substitutions,
-- cancelled lessons,
+- current week and next week,
+- classroom and teacher,
+- substitutions and cancelled lessons,
 - active lessons today,
 - local read-only Home Assistant calendar,
-- `pierwsza_lekcja_dzis_start` attribute for alarm automations,
+- `pierwsza_lekcja_dzis_start` for alarm automations,
 - dedicated **Next lesson** timestamp sensor.
 
-### Adaptive refresh — added in v1.6.0
+### Adaptive refresh
 
 New installations use **Automatic mode** by default:
 
@@ -203,14 +188,9 @@ New installations use **Automatic mode** by default:
 - weekends 06:00–22:00 → every **30 minutes**,
 - night → every **60 minutes**.
 
-The interval is recalculated before each cycle so a long night interval does not delay the first morning update.
+The interval is recalculated before each cycle so a long night interval does not delay the first morning update. Each account can instead use a custom **5–360 minute** interval.
 
-You can switch each student account to a custom **5–360 minute** interval.
-
-Timetable refresh remains independent:
-
-- configurable **30–720 minutes**,
-- additional checks at **04:00** and **20:30** in the Home Assistant time zone.
+Timetable refresh remains independent: configurable **30–720 minutes**, with additional checks at **04:00** and **20:30** in the Home Assistant time zone.
 
 This is still `cloud_polling`, not true push real-time.
 
@@ -224,68 +204,29 @@ The timetable has a persistent cache stored separately for each student account.
 - Home Assistant restart without Librus access → timetable starts from cache,
 - failure of one main-data section → other sections still update and the previous valid value is retained for the failed section.
 
-Useful timetable diagnostics include:
-
-- `status_danych` — `librus`, `cache` or `none`,
-- `dane_aktualne`,
-- `ostatnia_poprawna_aktualizacja`,
-- `ostatni_blad`,
-- `bledy_tygodni`,
-- `pierwsza_lekcja_dzis_start`,
-- `aktywne_lekcje_wg_daty`.
+Useful timetable diagnostics include `status_danych`, `dane_aktualne`, `ostatnia_poprawna_aktualizacja`, `ostatni_blad`, `bledy_tygodni`, `pierwsza_lekcja_dzis_start` and `aktywne_lekcje_wg_daty`.
 
 ### Diagnostics
 
-The integration includes a dedicated **Status** sensor with states:
-
-- `ok`,
-- `ostrzezenie`,
-- `blad`.
-
-It also exposes:
-
-- last successful main-data update,
-- refresh mode,
-- current refresh interval,
-- timetable source/cache information,
-- partial failure details.
+The integration includes a dedicated **Status** sensor with states `ok`, `ostrzezenie` and `blad`. It also exposes the last successful main-data update, refresh mode, current refresh interval, timetable source/cache information and partial failure details.
 
 ### Automation-ready entities
 
-Depending on available Librus data, the integration provides binary sensors for:
-
-- new messages,
-- new grades,
-- new behaviour entry,
-- new notes,
-- upcoming calendar entries,
-- homework due today or overdue.
-
-It also emits Home Assistant events for newly detected data, including grades, behaviour, messages, homework, calendar entries, notes and special achievements.
+Depending on available Librus data, the integration provides binary sensors for new messages, new grades, new behaviour entries, new notes, upcoming calendar entries and homework due today/overdue. It also emits Home Assistant events for newly detected grades, behaviour, messages, homework, calendar entries, notes and special achievements.
 
 ### Manual controls
 
-Two buttons are available:
-
-- **Refresh all data**,
-- **Refresh timetable**.
+Two buttons are available: **Refresh all data** and **Refresh timetable**.
 
 ### Multiple students
 
-Each Librus account is configured independently and gets its own:
-
-- entities,
-- timetable cache,
-- refresh settings,
-- diagnostics.
+Each Librus account is configured independently and gets its own entities, timetable cache, refresh settings, persistent acknowledgement store and diagnostics.
 
 ---
 
 ## Main entities created per student
 
 Exact `entity_id` values depend on the student name and the existing Home Assistant entity registry.
-
-Typical entities include:
 
 | Type | Entity | Purpose |
 |---|---|---|
@@ -309,9 +250,9 @@ Typical entities include:
 | sensor | Nearest test | Next test/exam |
 | sensor | Nearest homework | Next homework deadline |
 | binary_sensor | New messages | Unread message indicator |
-| binary_sensor | New grades | Recent grade indicator |
-| binary_sensor | New behaviour entry | Recent behaviour indicator |
-| binary_sensor | New notes | Recent note indicator |
+| binary_sensor | New grades | Unacknowledged grade indicator |
+| binary_sensor | New behaviour entry | Unacknowledged behaviour indicator |
+| binary_sensor | New notes | Unacknowledged note indicator |
 | binary_sensor | Calendar has entries | Upcoming calendar indicator |
 | binary_sensor | Homework today | Today/overdue homework indicator |
 | calendar | Timetable | Read-only lesson calendar |
@@ -324,16 +265,7 @@ Typical entities include:
 
 ## Reliability notes
 
-This integration is designed around real-world temporary Librus failures rather than assuming every request succeeds.
-
-The current implementation includes:
-
-- partial-section failure handling,
-- timetable cache,
-- per-week timetable recovery,
-- login-attempt throttling during outages,
-- status diagnostics,
-- baseline detection for new items after restart.
+The integration is designed around real-world temporary Librus failures rather than assuming every request succeeds. It includes partial-section failure handling, timetable cache, per-week timetable recovery, login-attempt throttling during outages, status diagnostics, event baselines after restart and persistent read acknowledgements.
 
 Because Librus is an external cloud service and this project relies on unofficial access methods, no unofficial integration can guarantee uninterrupted compatibility after changes made by Librus.
 
@@ -345,13 +277,14 @@ The integration runs inside your Home Assistant instance.
 
 - credentials are stored in the Home Assistant config entry,
 - Smart Home With Me does not receive your Librus username, password or school data,
-- account credentials visible on Librus information pages are not copied into Home Assistant entities or the timetable cache.
+- account credentials visible on Librus information pages are not copied into Home Assistant entities or the timetable cache,
+- persistent read state stores only short hashed identifiers, not message/grade contents.
 
 ---
 
 ## Version
 
-Current stable version: **1.6.2**
+Current stable version: **1.7.0**
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete development history.
 

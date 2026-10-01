@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.0
+
+- Added persistent read acknowledgements stored internally by the integration for grades, calendar entries, homework, current behaviour and notes; no `input_text` helper is required.
+- Added `librus_apix.potwierdz_odczytanie` for acknowledging a whole category or one selected item.
+- Read state now survives Home Assistant restarts and does not depend on a date-based “today or yesterday” flag.
+- Existing data is treated as the initial read baseline on first start after upgrading, so old grades/events do not suddenly appear as new.
+- Messages keep the real Librus unread flag as their primary state, while an explicit local acknowledgement can suppress delayed Librus unread updates.
+- Grade entries now preserve the stable Librus `href`, which is used for persistent item identity when available.
+- Non-standard grade markers such as `T` are resolved through the grade-details page. Point-based diagnostic results expose the full details and a compact display such as `T · 15/21 pkt` instead of an unexplained marker alone.
+
 ## 1.6.2
 
 - Fixed Home Assistant Recorder warnings when timetable sensor attributes exceed the 16 KiB history-storage limit.
