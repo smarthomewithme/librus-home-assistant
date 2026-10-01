@@ -73,6 +73,11 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
                     index = int(selected)
                 except (TypeError, ValueError):
                     index = None
+            if index is None:
+                label = "wiadomości" if category == "wiadomosci" else "wydarzenia"
+                raise HomeAssistantError(
+                    f"Najpierw wybierz konkretną pozycję {label} albo podaj indeks"
+                )
 
         coordinator = runtime["main_coordinator"]
         try:
