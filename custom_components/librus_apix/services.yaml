@@ -49,11 +49,15 @@ potwierdz_odczytanie:
     Trwale zapamiętuje odczytanie danych Librusa wewnątrz integracji, bez
     helperów input_text. Obsługuje oceny, terminarz, wiadomości, zadania,
     zachowanie oraz uwagi.
-  target:
-    entity:
-      integration: librus_apix
-      domain: sensor
   fields:
+    entity_id:
+      name: Encja Librusa
+      description: Encja należąca do konta ucznia, którego odczyt ma zostać zapisany.
+      required: true
+      selector:
+        entity:
+          integration: librus_apix
+          domain: sensor
     kategoria:
       name: Kategoria
       description: Rodzaj danych, które mają zostać oznaczone jako odczytane.
