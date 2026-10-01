@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from hashlib import sha256
-from typing import Any, Iterable
+from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
@@ -270,8 +270,9 @@ class LibrusAcknowledgements:
         if not identifiers:
             return
 
+        was_initialized = category in self._initialized
         before = len(self._read[category])
         self._read[category].update(identifiers)
         self._initialized.add(category)
-        if len(self._read[category]) != before:
+        if len(self._read[category]) != before or not was_initialized:
             await self._async_save()
