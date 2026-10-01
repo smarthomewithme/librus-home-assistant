@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .acknowledgements import LibrusAcknowledgements
+from .const import DEFAULT_MESSAGES_COUNT
 from .coordinator import LibrusDataUpdateCoordinator, _is_recent
 from .smart_client import SmartHomeLibrusApiClient
 
@@ -57,6 +58,16 @@ class SmartHomeLibrusDataUpdateCoordinator(LibrusDataUpdateCoordinator):
         result["oceny_wg_przedmiotu"] = dict(grouped)
 
         return await self.acknowledgements.async_prepare(result)
+
+    async def async_refresh_messages_only(self) -> bool:
+        """Refresh message headers without dropping persistent read state."""
+        messages = await self.client.async_get_messages(DEFAULT_MESSAGES_COUNT)
+        if messages is None:
+            return False
+        data = deepcopy(self.data or {})
+        data["wiadomosci"] = self._prepare_messages(messages)
+        self.async_set_updated_data(self.acknowledgements.decorate_data(data))
+        return True
 
     async def async_acknowledge(
         self,
