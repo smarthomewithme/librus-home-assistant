@@ -93,7 +93,16 @@ def _grade_metadata_value(description: str, *labels: str) -> str:
 
 
 def _grade_weight(grade: Any) -> float | None:
-    """Odczytaj wagę oceny, jeśli Librus udostępnia ją w metadanych."""
+    """Odczytaj wagę z obiektu librus-apix, z fallbackiem do tooltipu."""
+    direct = getattr(grade, "weight", None)
+    if direct not in (None, ""):
+        try:
+            value = float(direct)
+        except (TypeError, ValueError):
+            value = 0.0
+        if value > 0:
+            return value
+
     description = str(getattr(grade, "desc", "") or "")
     raw = _grade_metadata_value(description, "waga", "weight").replace(",", ".")
     if not raw:
@@ -109,7 +118,17 @@ def _grade_weight(grade: Any) -> float | None:
 
 
 def _grade_counts_to_average(grade: Any) -> bool | None:
-    """Zwróć informację, czy Librus oznacza ocenę jako liczoną do średniej."""
+    """Zwróć flagę counts librus-apix, z fallbackiem do tooltipu."""
+    direct = getattr(grade, "counts", None)
+    if isinstance(direct, bool):
+        return direct
+    if direct not in (None, ""):
+        normalized = str(direct).strip().casefold()
+        if normalized in {"tak", "yes", "true", "1"}:
+            return True
+        if normalized in {"nie", "no", "false", "0"}:
+            return False
+
     description = str(getattr(grade, "desc", "") or "")
     raw = _grade_metadata_value(
         description,
