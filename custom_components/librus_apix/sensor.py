@@ -874,7 +874,7 @@ class LibrusFrekwencjaSensor(CoordinatorEntity, SensorEntity):
         symbol = cls._symbol(entry)
         entry_type = cls._type(entry)
         return (
-            symbol in {"nb", "u"}
+            symbol in {"nb", "u", "zw"}
             or "nieobec" in entry_type
             or "absence" in entry_type
         )
@@ -887,7 +887,12 @@ class LibrusFrekwencjaSensor(CoordinatorEntity, SensorEntity):
         entry_type = cls._type(entry)
         if "nieuspraw" in entry_type:
             return False
-        return symbol == "u" or "uspraw" in entry_type or "excused" in entry_type
+        return (
+            symbol in {"u", "zw"}
+            or "uspraw" in entry_type
+            or "zwoln" in entry_type
+            or "excused" in entry_type
+        )
 
     @classmethod
     def _is_unexcused_absence(cls, entry: Dict[str, Any]) -> bool:
