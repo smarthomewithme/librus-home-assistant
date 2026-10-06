@@ -29,6 +29,7 @@ from .coordinator import LibrusDataUpdateCoordinator
 from .entity import librus_device_info
 from .timetable import (
     active_lessons,
+    attach_schedule_events,
     current_active_lesson,
     first_active_lesson,
     lessons_by_date,
@@ -116,7 +117,9 @@ async def async_setup_entry(
         LibrusNieusprawiedliwioneNieobecnosciSensor(coordinator, config_entry),
         LibrusOgloszeniaSensor(coordinator, config_entry),
         LibrusSredniaOcenSensor(coordinator, config_entry),
-        LibrusPlanLekcjiSensor(timetable_coordinator, config_entry),
+        LibrusPlanLekcjiSensor(
+            timetable_coordinator, coordinator, config_entry
+        ),
         LibrusAktualnaLekcjaSensor(timetable_coordinator, config_entry),
         LibrusNastepnaLekcjaSensor(timetable_coordinator, config_entry),
         LibrusStatusSensor(coordinator, timetable_coordinator, config_entry),
@@ -1171,18 +1174,29 @@ class LibrusPlanLekcjiSensor(
             "lekcje_wg_daty",
             "aktywne_lekcje_wg_daty",
             "godziny_lekcji",
+            "lekcje_z_wydarzeniami",
+            "niedopasowane_wydarzenia",
         }
     )
 
     def __init__(
         self,
         coordinator: LibrusTimetableCoordinator,
+        main_coordinator: LibrusDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         """Zainicjalizuj czujnik."""
         super().__init__(coordinator)
+        self._main_coordinator = main_coordinator
         self._config_entry = config_entry
         self._attr_unique_id = f"{config_entry.entry_id}_timetable"
+
+    async def async_added_to_hass(self) -> None:
+        """Aktualizuj po zmianie planu albo terminarza."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            self._main_coordinator.async_add_listener(self.async_write_ha_state)
+        )
 
     @property
     def device_info(self) -> Dict[str, Any]:
@@ -1205,6 +1219,10 @@ class LibrusPlanLekcjiSensor(
         first_today = first_active_lesson(lessons, today)
         first_tomorrow = first_active_lesson(lessons, tomorrow)
         next_lesson = next_active_lesson(lessons, dt_util.now())
+        schedule = (self._main_coordinator.data or {}).get("terminarz", [])
+        lessons_with_events, unmatched_events = attach_schedule_events(
+            lessons, schedule
+        )
 
         return {
             "status_danych": data.get("source", "none"),
@@ -1246,6 +1264,8 @@ class LibrusPlanLekcjiSensor(
                 active_lessons(lessons), active_only=True
             ),
             "godziny_lekcji": timetable_hours(lessons),
+            "lekcje_z_wydarzeniami": lessons_with_events,
+            "niedopasowane_wydarzenia": unmatched_events,
         }
 
 
