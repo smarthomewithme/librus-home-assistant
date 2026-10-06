@@ -9,6 +9,7 @@
   "documentation": "https://www.smarthomewithme.com",
   "integration_type": "service",
   "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/smarthomewithme/librus-home-assistant/issues",
   "requirements": [
     "librus-apix==1.5.1"
   ],
