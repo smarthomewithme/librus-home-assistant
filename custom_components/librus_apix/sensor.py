@@ -27,6 +27,7 @@ from .const import (
 )
 from .coordinator import LibrusDataUpdateCoordinator
 from .entity import librus_device_info
+from .grade_math import average_grades as _srednia_ocen
 from .timetable import (
     active_lessons,
     attach_schedule_events,
@@ -41,52 +42,6 @@ from .timetable_coordinator import LibrusTimetableCoordinator
 
 _MESSAGE_SERVICE_REGISTERED = "_message_service_registered"
 _SCHEDULE_SERVICE_REGISTERED = "_schedule_service_registered"
-
-
-def _wartosc_oceny(grade: Any) -> Optional[float]:
-    """Zamień typową ocenę 1-6 (+/-) na liczbę; pomiń kody i punktację."""
-    raw = str(grade or "").strip()
-    if not raw or raw[0] not in "123456":
-        return None
-    try:
-        base = float(raw[0])
-    except ValueError:
-        return None
-    if "+" in raw[1:]:
-        base += 0.5
-    elif "-" in raw[1:]:
-        base -= 0.25
-    return base
-
-
-def _srednia_ocen(
-    oceny: List[Dict], *, weighted: bool = False
-) -> Optional[float]:
-    """Oblicz średnią arytmetyczną albo ważoną bez zgadywania brakujących wag."""
-    suma = 0.0
-    mianownik = 0.0
-    for grade in oceny:
-        counts_to_average = grade.get(
-            "liczy_do_sredniej", grade.get("counts_to_average")
-        )
-        if counts_to_average is False:
-            continue
-        value = _wartosc_oceny(grade.get("ocena", ""))
-        if value is None:
-            continue
-        if weighted:
-            raw_weight = grade.get("waga", grade.get("weight"))
-            try:
-                weight = float(raw_weight) if raw_weight not in (None, "") else 1.0
-            except (TypeError, ValueError):
-                weight = 1.0
-            if weight <= 0:
-                weight = 1.0
-        else:
-            weight = 1.0
-        suma += value * weight
-        mianownik += weight
-    return round(suma / mianownik, 2) if mianownik else None
 
 
 async def async_setup_entry(
