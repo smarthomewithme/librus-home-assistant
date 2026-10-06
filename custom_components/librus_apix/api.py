@@ -12,7 +12,7 @@ from typing import Any, TypeVar
 from bs4 import BeautifulSoup, Tag
 
 from librus_apix.client import Client, new_client
-from librus_apix.exceptions import TokenError
+from librus_apix.exceptions import AuthorizationError, TokenError
 from librus_apix.helpers import no_access_check
 
 _LOGGER = logging.getLogger(__name__)
@@ -476,6 +476,8 @@ class LibrusApiClient:
         self._auth_lock = asyncio.Lock()
         self._request_lock = asyncio.Lock()
         self._auth_retry_after = 0.0
+        self._authorization_failed = False
+        self._reauth_requested = False
 
     async def _run_blocking(self, function: Callable[..., _ResultT], *args: Any) -> _ResultT:
         """Wykonaj blokujące wywołanie biblioteki poza pętlą HA."""
@@ -488,6 +490,15 @@ class LibrusApiClient:
         self._client = None
         self._token = None
         self._auth_retry_after = 0.0
+
+    @property
+    def needs_reauth(self) -> bool:
+        """Czy Librus jawnie odrzucił dane logowania i HA nie pokazał jeszcze flow."""
+        return self._authorization_failed and not self._reauth_requested
+
+    def mark_reauth_requested(self) -> None:
+        """Nie uruchamiaj kilku równoległych flow reautoryzacji."""
+        self._reauth_requested = True
 
     async def async_authenticate(self) -> bool:
         """Utwórz sesję i pobierz token Librusa."""
@@ -507,14 +518,23 @@ class LibrusApiClient:
                 )
                 if not token:
                     raise ValueError("Librus nie zwrócił tokenu logowania")
-            except Exception as err:  # biblioteka zgłasza kilka typów błędów sieci
+            except AuthorizationError as err:
                 self._reset_authentication()
+                self._authorization_failed = True
+                self._auth_retry_after = loop.time() + 30
+                _LOGGER.warning("Librus odrzucił dane logowania: %s", err)
+                return False
+            except Exception as err:  # awaria sieci/serwisu nie oznacza złego hasła
+                self._reset_authentication()
+                self._authorization_failed = False
                 self._auth_retry_after = loop.time() + 30
                 _LOGGER.warning("Logowanie do Librusa nie powiodło się: %s", err)
                 return False
 
             self._client = client
             self._token = token
+            self._authorization_failed = False
+            self._reauth_requested = False
             self._auth_retry_after = 0.0
             return True
 
