@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.8.0-beta.1
+
+- Added native **Current lesson** sensor with subject, period, teacher, classroom, substitution flag and minutes remaining. The sensor recalculates locally every minute without additional Librus requests.
+- Existing **Next lesson** sensor now also recalculates locally every minute, so lesson boundaries do not wait for the next timetable download.
+- Added deterministic school-calendar → timetable matching. Events are attached only when the date and lesson number match, or when a missing lesson number still leaves one unambiguous subject match; ambiguous items remain explicitly unmatched instead of being guessed.
+- Added Librus grade **weight** and **counts toward average** metadata using native librus-apix fields with a tooltip fallback.
+- Added weighted-average attributes globally and per subject while keeping the existing arithmetic-average sensor state for backwards compatibility.
+- Grades explicitly marked by Librus as not counting toward the average are excluded from both arithmetic and weighted calculations.
+- Expanded attendance data with excused/unexcused counts, releases, lateness and per-subject absence breakdowns.
+- Added a dedicated **Unexcused absences** sensor with recent entries.
+- Added privacy-safe Home Assistant **Download diagnostics** support. Diagnostics intentionally exclude grades, messages, notes and other student content.
+- Added **Reconfigure** flow for changing the Librus password without deleting the config entry, entity IDs or dashboard references.
+- Added CI validation: Python compilation, pure timetable unit tests, Home Assistant hassfest and HACS validation.
+- Added initial unit tests for current-lesson detection and calendar-to-lesson matching.
+- No Weekly AI Summary was added in this release.
+
 ## 1.7.0
 
 - Added persistent read acknowledgements stored internally by the integration for grades, calendar entries, homework, current behaviour and notes; no `input_text` helper is required.
