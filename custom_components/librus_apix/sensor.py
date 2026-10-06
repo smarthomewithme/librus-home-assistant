@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
@@ -1274,6 +1275,17 @@ class LibrusAktualnaLekcjaSensor(
         data = self.coordinator.data or {}
         return current_active_lesson(data.get("lessons", []), dt_util.now())
 
+    async def async_added_to_hass(self) -> None:
+        """Odśwież stan co minutę także bez pobierania nowego planu."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_interval(
+                self.hass,
+                lambda _now: self.async_write_ha_state(),
+                timedelta(minutes=1),
+            )
+        )
+
     @property
     def native_value(self) -> str | None:
         lesson = self._lesson()
@@ -1345,6 +1357,17 @@ class LibrusNastepnaLekcjaSensor(
     def device_info(self) -> Dict[str, Any]:
         """Powiaz czujnik z urzadzeniem ucznia."""
         return librus_device_info(self._config_entry)
+
+    async def async_added_to_hass(self) -> None:
+        """Przelicz najbliższą lekcję co minutę bez dodatkowego requestu."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_interval(
+                self.hass,
+                lambda _now: self.async_write_ha_state(),
+                timedelta(minutes=1),
+            )
+        )
 
     @property
     def native_value(self) -> datetime | None:
