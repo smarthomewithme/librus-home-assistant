@@ -225,6 +225,23 @@ def first_active_lesson(
     return day[0] if day else None
 
 
+def current_active_lesson(
+    lessons: Iterable[Mapping[str, Any]], now: datetime
+) -> dict[str, Any] | None:
+    """Zwróć aktywną lekcję trwającą dokładnie w tej chwili."""
+    comparison_now = now.replace(tzinfo=None) if now.tzinfo else now
+    candidates: list[tuple[datetime, dict[str, Any]]] = []
+    for lesson in active_lessons(lessons):
+        try:
+            start = datetime.fromisoformat(f"{lesson['date']}T{lesson['start']}")
+            end = datetime.fromisoformat(f"{lesson['date']}T{lesson['end']}")
+        except (KeyError, TypeError, ValueError):
+            continue
+        if start <= comparison_now < end:
+            candidates.append((start, lesson))
+    return min(candidates, key=lambda item: item[0])[1] if candidates else None
+
+
 def next_active_lesson(
     lessons: Iterable[Mapping[str, Any]], now: datetime
 ) -> dict[str, Any] | None:
