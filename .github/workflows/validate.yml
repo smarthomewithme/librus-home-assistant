@@ -21,6 +21,8 @@ jobs:
           python-version: "3.13"
       - name: Compile Python sources
         run: python -m compileall -q custom_components/librus_apix
+      - name: Run pure unit tests
+        run: python -m unittest discover -s tests -p "test_*.py"
 
   hassfest:
     runs-on: ubuntu-latest
