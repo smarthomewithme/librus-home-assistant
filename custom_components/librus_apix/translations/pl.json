@@ -16,15 +16,24 @@
         "data": {
           "password": "Nowe hasło"
         }
+      },
+      "reauth_confirm": {
+        "title": "Ponowne logowanie do Librusa",
+        "description": "Librus odrzucił zapisane dane logowania dla konta **{username}**. Podaj aktualne hasło.",
+        "data": {
+          "password": "Hasło"
+        }
       }
     },
     "error": {
       "cannot_connect": "Nie udało się zalogować do Librusa. Sprawdź dane i dostępność serwisu.",
-      "unknown": "Wystąpił nieoczekiwany błąd. Sprawdź dziennik Home Assistanta."
+      "unknown": "Wystąpił nieoczekiwany błąd. Sprawdź dziennik Home Assistanta.",
+      "invalid_auth": "Librus odrzucił login lub hasło."
     },
     "abort": {
       "already_configured": "To konto Librus jest już skonfigurowane.",
-      "reconfigure_successful": "Dane logowania zostały zaktualizowane."
+      "reconfigure_successful": "Dane logowania zostały zaktualizowane.",
+      "reauth_successful": "Dane logowania zostały zaktualizowane."
     }
   },
   "options": {
