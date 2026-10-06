@@ -64,13 +64,16 @@ def _srednia_ocen(
     suma = 0.0
     mianownik = 0.0
     for grade in oceny:
-        if grade.get("counts_to_average") is False:
+        counts_to_average = grade.get(
+            "liczy_do_sredniej", grade.get("counts_to_average")
+        )
+        if counts_to_average is False:
             continue
         value = _wartosc_oceny(grade.get("ocena", ""))
         if value is None:
             continue
         if weighted:
-            raw_weight = grade.get("weight")
+            raw_weight = grade.get("waga", grade.get("weight"))
             try:
                 weight = float(raw_weight) if raw_weight not in (None, "") else 1.0
             except (TypeError, ValueError):
@@ -1274,7 +1277,9 @@ class LibrusAktualnaLekcjaSensor(
     @property
     def native_value(self) -> str | None:
         lesson = self._lesson()
-        return str(lesson.get("subject", "") or "") or None if lesson else None
+        if not lesson:
+            return None
+        return str(lesson.get("subject", "") or "").strip() or None
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
