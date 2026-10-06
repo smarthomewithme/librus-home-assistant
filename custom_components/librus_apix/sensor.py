@@ -1261,8 +1261,20 @@ class LibrusPlanLekcjiSensor(
         first_tomorrow = first_active_lesson(lessons, tomorrow)
         next_lesson = next_active_lesson(lessons, dt_util.now())
         schedule = (self._main_coordinator.data or {}).get("terminarz", [])
+        allowed_schedule_dates: set[str] = set()
+        for raw_week_start in data.get("requested_week_starts", []):
+            try:
+                week_start = date.fromisoformat(str(raw_week_start))
+            except (TypeError, ValueError):
+                continue
+            allowed_schedule_dates.update(
+                (week_start + timedelta(days=offset)).isoformat()
+                for offset in range(7)
+            )
         lessons_with_events, unmatched_events = attach_schedule_events(
-            lessons, schedule
+            lessons,
+            schedule,
+            allowed_dates=allowed_schedule_dates or None,
         )
 
         return {
