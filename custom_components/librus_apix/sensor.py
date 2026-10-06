@@ -18,6 +18,12 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
+from .attendance import (
+    is_absence as _is_attendance_absence,
+    is_excused_absence as _is_excused_absence,
+    is_late as _is_attendance_late,
+    is_unexcused_absence as _is_unexcused_absence,
+)
 from .const import (
     ATTR_MESSAGE_INDEX,
     ATTR_SCHEDULE_INDEX,
@@ -846,62 +852,19 @@ class LibrusFrekwencjaSensor(CoordinatorEntity, SensorEntity):
     def device_info(self) -> Dict[str, Any]:
         return _device_info(self.coordinator, self._config_entry)
 
-    @staticmethod
-    def _symbol(entry: Dict[str, Any]) -> str:
-        return str(entry.get("symbol", "") or "").strip().casefold()
-
-    @staticmethod
-    def _type(entry: Dict[str, Any]) -> str:
-        return str(entry.get("typ", "") or "").strip().casefold()
-
-    @classmethod
-    def _is_late(cls, entry: Dict[str, Any]) -> bool:
-        symbol = cls._symbol(entry)
-        entry_type = cls._type(entry)
-        return symbol == "sp" or "spóź" in entry_type or "spoz" in entry_type
-
-    @classmethod
-    def _is_absence(cls, entry: Dict[str, Any]) -> bool:
-        symbol = cls._symbol(entry)
-        entry_type = cls._type(entry)
-        return (
-            symbol in {"nb", "u", "zw"}
-            or "nieobec" in entry_type
-            or "absence" in entry_type
-        )
-
-    @classmethod
-    def _is_excused_absence(cls, entry: Dict[str, Any]) -> bool:
-        if not cls._is_absence(entry):
-            return False
-        symbol = cls._symbol(entry)
-        entry_type = cls._type(entry)
-        if "nieuspraw" in entry_type:
-            return False
-        return (
-            symbol in {"u", "zw"}
-            or "uspraw" in entry_type
-            or "zwoln" in entry_type
-            or "excused" in entry_type
-        )
-
-    @classmethod
-    def _is_unexcused_absence(cls, entry: Dict[str, Any]) -> bool:
-        return cls._is_absence(entry) and not cls._is_excused_absence(entry)
-
     @property
     def native_value(self) -> int:
         """Stan pozostaje liczbą wszystkich nieobecności dla kompatybilności."""
         entries = (self.coordinator.data or {}).get("frekwencja", [])
-        return sum(1 for entry in entries if self._is_absence(entry))
+        return sum(1 for entry in entries if _is_attendance_absence(entry))
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         entries = (self.coordinator.data or {}).get("frekwencja", [])
-        absences = [entry for entry in entries if self._is_absence(entry)]
-        excused = [entry for entry in absences if self._is_excused_absence(entry)]
-        unexcused = [entry for entry in absences if self._is_unexcused_absence(entry)]
-        late = [entry for entry in entries if self._is_late(entry)]
+        absences = [entry for entry in entries if _is_attendance_absence(entry)]
+        excused = [entry for entry in absences if _is_excused_absence(entry)]
+        unexcused = [entry for entry in absences if _is_unexcused_absence(entry)]
+        late = [entry for entry in entries if _is_attendance_late(entry)]
 
         by_subject: Dict[str, Dict[str, int]] = {}
         for entry in entries:
@@ -915,13 +878,13 @@ class LibrusFrekwencjaSensor(CoordinatorEntity, SensorEntity):
                     "spoznienia": 0,
                 },
             )
-            if self._is_absence(entry):
+            if _is_attendance_absence(entry):
                 bucket["nieobecnosci"] += 1
-                if self._is_excused_absence(entry):
+                if _is_excused_absence(entry):
                     bucket["usprawiedliwione"] += 1
                 else:
                     bucket["nieusprawiedliwione"] += 1
-            if self._is_late(entry):
+            if _is_attendance_late(entry):
                 bucket["spoznienia"] += 1
 
         return {
@@ -963,7 +926,7 @@ class LibrusNieusprawiedliwioneNieobecnosciSensor(
         return [
             entry
             for entry in entries
-            if LibrusFrekwencjaSensor._is_unexcused_absence(entry)
+            if _is_unexcused_absence(entry)
         ]
 
     @property
