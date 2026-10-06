@@ -49,6 +49,8 @@ class SmartHomeLibrusDataUpdateCoordinator(LibrusDataUpdateCoordinator):
                     "komentarz": grade.get("comment", ""),
                     "nauczyciel": grade.get("teacher", ""),
                     "semestr": grade.get("semester"),
+                    "waga": grade.get("weight"),
+                    "liczy_do_sredniej": grade.get("counts_to_average"),
                     "href": grade.get("href", ""),
                     "szczegoly_oceny": grade.get("grade_details", ""),
                     "szczegoly": grade.get("details", {}),
