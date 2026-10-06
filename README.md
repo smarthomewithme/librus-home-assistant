@@ -80,6 +80,8 @@ Version 1.7.0 also preserves the Librus grade-detail link. Non-standard grade ma
 
 Behaviour values are kept separate from normal grades and are not included in grade averages.
 
+Non-numeric descriptive assessments returned by Librus are preserved in a separate **Descriptive grades** sensor, so schools using descriptive grading do not lose those entries and they do not distort numeric averages.
+
 ### Student information
 
 - student name,
@@ -167,6 +169,8 @@ data:
 
 The integration does not invent a percentage when the legacy attendance feed does not provide a reliable denominator of all lessons.
 
+After the first successful attendance read establishes a baseline, a newly detected unexcused absence also emits `librus_apix_nowa_nieusprawiedliwiona_nieobecnosc` for notifications and Node-RED automations.
+
 ### Announcements
 
 - school announcements,
@@ -223,13 +227,15 @@ Version 1.8 also adds Home Assistant's native **Download diagnostics** output. I
 
 ### Automation-ready entities
 
-Depending on available Librus data, the integration provides binary sensors for new messages, new grades, new behaviour entries, new notes, upcoming calendar entries and homework due today/overdue. It also emits Home Assistant events for newly detected grades, behaviour, messages, homework, calendar entries, notes and special achievements.
+Depending on available Librus data, the integration provides binary sensors for new messages, new grades, new behaviour entries, new notes, upcoming calendar entries and homework due today/overdue. It also emits Home Assistant events for newly detected grades, behaviour, messages, homework, calendar entries, notes, special achievements and newly detected unexcused absences.
 
 ### Manual controls
 
 Two buttons are available: **Refresh all data** and **Refresh timetable**.
 
 The integration can also be **reconfigured** from Home Assistant to update the Librus password without deleting the integration entry or losing entity IDs.
+
+If Librus explicitly rejects the stored credentials, Home Assistant starts its normal **reauthentication** flow automatically. Temporary connection failures or Librus maintenance are kept separate and do not trigger a misleading password prompt.
 
 ### Multiple students
 
@@ -246,6 +252,7 @@ Exact `entity_id` values depend on the student name and the existing Home Assist
 | sensor | Student information | Student and class details |
 | sensor | Lucky number | Daily lucky number |
 | sensor | Grades | Grade count and full grade list |
+| sensor | Descriptive grades | Non-numeric descriptive assessments |
 | sensor | Classification behaviour | Semester/year behaviour grade |
 | sensor | Current behaviour | Live behaviour entries |
 | sensor | Notes | Notes from Student → Notes |
