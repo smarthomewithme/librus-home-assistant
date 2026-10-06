@@ -106,6 +106,7 @@ async def async_setup_entry(
         LibrusUczenSensor(coordinator, config_entry),
         LibrusSzczesliwyNumerekSensor(coordinator, config_entry),
         LibrusOcenySensor(coordinator, config_entry),
+        LibrusOcenyOpisoweSensor(coordinator, config_entry),
         LibrusZachowanieSensor(coordinator, config_entry),
         LibrusZachowanieBiezaceSensor(coordinator, config_entry),
         LibrusUwagiSensor(coordinator, config_entry),
@@ -289,6 +290,41 @@ class LibrusOcenySensor(CoordinatorEntity, SensorEntity):
             "liczba_przedmiotow": len(oceny_wg_przedmiotu),
             "sa_nowe_oceny": sa_nowe,
             "semestr": data.get("semestr_biezacy"),
+        }
+
+
+class LibrusOcenyOpisoweSensor(CoordinatorEntity, SensorEntity):
+    """Nienumeryczne oceny opisowe, odseparowane od zwykłych ocen 1-6."""
+
+    def __init__(
+        self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry
+    ) -> None:
+        super().__init__(coordinator)
+        self._config_entry = config_entry
+        self._attr_has_entity_name = False
+        self._attr_name = "Oceny opisowe"
+        self._attr_unique_id = f"{config_entry.entry_id}_oceny_opisowe"
+        self._attr_icon = "mdi:text-box-check-outline"
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        return _device_info(self.coordinator, self._config_entry)
+
+    def _entries(self) -> list[dict[str, Any]]:
+        return list((self.coordinator.data or {}).get("oceny_opisowe", []))
+
+    @property
+    def native_value(self) -> int:
+        return len(self._entries())
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        entries = self._entries()
+        return {
+            "wpisy": entries,
+            "liczba_wpisow": len(entries),
+            "sa_nowe_wpisy": any(item.get("jest_nowa", False) for item in entries),
+            "semestr": (self.coordinator.data or {}).get("semestr_biezacy"),
         }
 
 
