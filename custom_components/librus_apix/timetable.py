@@ -262,6 +262,8 @@ def next_active_lesson(
 def attach_schedule_events(
     lessons: Iterable[Mapping[str, Any]],
     events: Iterable[Mapping[str, Any]],
+    *,
+    allowed_dates: Iterable[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Powiąż terminarz z planem bez zgadywania przy niejednoznacznych danych.
 
@@ -276,6 +278,7 @@ def attach_schedule_events(
         lesson["wydarzenia"] = []
 
     unmatched: list[dict[str, Any]] = []
+    allowed = set(allowed_dates) if allowed_dates is not None else None
     by_date: dict[str, list[dict[str, Any]]] = {}
     for lesson in enriched:
         lesson_date = str(lesson.get("date", "") or "")
@@ -285,6 +288,8 @@ def attach_schedule_events(
     for raw_event in events:
         event = dict(raw_event)
         event_date = str(event.get("data", "") or "")
+        if allowed is not None and event_date not in allowed:
+            continue
         candidates = by_date.get(event_date, [])
         if not candidates:
             unmatched.append(event)
