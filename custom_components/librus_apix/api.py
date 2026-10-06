@@ -79,6 +79,53 @@ def _grade_comment(grade: Any) -> str:
     return _comment_from_description(str(getattr(grade, "desc", "") or ""))
 
 
+def _grade_metadata_value(description: str, *labels: str) -> str:
+    """Odczytaj pojedynczą wartość z metadanych tooltipu oceny."""
+    wanted = tuple(label.casefold().rstrip(":") for label in labels)
+    for line in str(description or "").replace("\r", "").split("\n"):
+        raw = line.strip()
+        if ":" not in raw:
+            continue
+        key, value = raw.split(":", 1)
+        if key.strip().casefold() in wanted:
+            return value.strip()
+    return ""
+
+
+def _grade_weight(grade: Any) -> float | None:
+    """Odczytaj wagę oceny, jeśli Librus udostępnia ją w metadanych."""
+    description = str(getattr(grade, "desc", "") or "")
+    raw = _grade_metadata_value(description, "waga", "weight").replace(",", ".")
+    if not raw:
+        return None
+    match = re.search(r"-?\d+(?:\.\d+)?", raw)
+    if not match:
+        return None
+    try:
+        value = float(match.group(0))
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
+def _grade_counts_to_average(grade: Any) -> bool | None:
+    """Zwróć informację, czy Librus oznacza ocenę jako liczoną do średniej."""
+    description = str(getattr(grade, "desc", "") or "")
+    raw = _grade_metadata_value(
+        description,
+        "licz do średniej",
+        "licz do sredniej",
+        "counts toward average",
+    ).casefold()
+    if not raw:
+        return None
+    if raw in {"tak", "yes", "true", "1"}:
+        return True
+    if raw in {"nie", "no", "false", "0"}:
+        return False
+    return None
+
+
 def _comment_path(cell: Tag) -> str:
     """Znajdź adres popupu komentarza zapisany w ``onclick`` znacznika K."""
     for link in cell.find_all("a"):
@@ -524,6 +571,8 @@ class LibrusApiClient:
                                 "comment": _grade_comment(grade),
                                 "teacher": getattr(grade, "teacher", ""),
                                 "semester": grade.semester,
+                                "weight": _grade_weight(grade),
+                                "counts_to_average": _grade_counts_to_average(grade),
                                 "type": entry_type,
                             }
                         )
