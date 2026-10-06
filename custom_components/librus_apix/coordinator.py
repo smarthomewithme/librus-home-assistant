@@ -137,6 +137,10 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception as err:
             raise UpdateFailed(f"Błąd komunikacji z Librusem: {err}") from err
 
+        if self.client.needs_reauth:
+            self._config_entry.async_start_reauth(self.hass)
+            self.client.mark_reauth_requested()
+
         previous = self.data or {}
         if not previous and all(
             value is None
