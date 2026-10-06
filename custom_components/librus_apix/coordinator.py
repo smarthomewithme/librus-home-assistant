@@ -158,6 +158,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if grades is None:
             prepared_grades = list(previous.get("oceny", []))
             grouped_grades = dict(previous.get("oceny_wg_przedmiotu", {}))
+            prepared_descriptive = list(previous.get("oceny_opisowe", []))
             prepared_behavior = list(previous.get("zachowanie", []))
             _LOGGER.warning("Nie udało się pobrać ocen; zachowuję poprzednie dane")
         else:
@@ -167,12 +168,31 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             academic_grades = [
                 grade
                 for grade in grades
-                if grade.get("type") not in {"behavior", "behavior_current"}
+                if grade.get("type")
+                not in {"behavior", "behavior_current", "descriptive_text"}
+            ]
+            descriptive_grades = [
+                grade
+                for grade in grades
+                if grade.get("type") == "descriptive_text"
             ]
             behavior_grades = [
                 grade for grade in grades if grade.get("type") == "behavior"
             ]
             prepared_grades = academic_grades
+            prepared_descriptive = [
+                {
+                    "przedmiot": grade.get("subject", ""),
+                    "wartosc": grade.get("grade", ""),
+                    "data": grade.get("date", ""),
+                    "opis": grade.get("comment", ""),
+                    "nauczyciel": grade.get("teacher", ""),
+                    "semestr": grade.get("semester"),
+                    "href": grade.get("href", ""),
+                    "jest_nowa": _is_recent(str(grade.get("date", ""))),
+                }
+                for grade in descriptive_grades
+            ]
             prepared_behavior = [
                 {
                     "stan": grade.get("grade", ""),
@@ -302,6 +322,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "student_info": student or previous.get("student_info"),
             "oceny": prepared_grades,
             "oceny_wg_przedmiotu": grouped_grades,
+            "oceny_opisowe": prepared_descriptive,
             "zachowanie": prepared_behavior,
             "zachowanie_biezace": prepared_current_behavior,
             "uwagi": prepared_notes,
@@ -322,7 +343,8 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 [
                     grade
                     for grade in grades
-                    if grade.get("type") not in {"behavior", "behavior_current"}
+                    if grade.get("type")
+                    not in {"behavior", "behavior_current", "descriptive_text"}
                 ]
                 if grades is not None
                 else None
