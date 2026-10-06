@@ -9,6 +9,13 @@
           "username": "Username",
           "password": "Password"
         }
+      },
+      "reconfigure": {
+        "title": "Update credentials",
+        "description": "Change the password for Librus account **{username}** without removing the integration or its entities.",
+        "data": {
+          "password": "New password"
+        }
       }
     },
     "error": {
@@ -16,7 +23,8 @@
       "unknown": "An unexpected error occurred. Check the Home Assistant logs."
     },
     "abort": {
-      "already_configured": "This Librus account is already configured."
+      "already_configured": "This Librus account is already configured.",
+      "reconfigure_successful": "The Librus credentials were updated."
     }
   },
   "options": {
