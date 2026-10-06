@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .api import LibrusApiClient, current_semester
+from .attendance import attendance_id, is_unexcused_absence
 from .const import (
     CONF_DATA_REFRESH_INTERVAL,
     DEFAULT_DATA_REFRESH_MINUTES,
@@ -35,6 +36,7 @@ EVENT_NEW_NOTE = f"{DOMAIN}_nowa_uwaga"
 EVENT_NEW_ACHIEVEMENT = f"{DOMAIN}_nowe_szczegolne_osiagniecie"
 EVENT_NEW_HOMEWORK = f"{DOMAIN}_nowe_zadanie"
 EVENT_NEW_SCHEDULE_ITEM = f"{DOMAIN}_nowe_zdarzenie"
+EVENT_NEW_UNEXCUSED_ABSENCE = f"{DOMAIN}_nowa_nieusprawiedliwiona_nieobecnosc"
 
 _DATE_FORMATS = (
     "%d.%m.%Y %H:%M:%S",
@@ -76,6 +78,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._seen_achievement_ids: set[tuple[Any, ...]] = set()
         self._seen_homework_ids: set[tuple[Any, ...]] = set()
         self._seen_schedule_ids: set[tuple[Any, ...]] = set()
+        self._seen_attendance_ids: set[tuple[str, ...]] = set()
         self._initialized_sections: set[str] = set()
 
         self._config_entry = config_entry
@@ -358,6 +361,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raw_achievements=raw_achievements,
             raw_homework=homework,
             raw_schedule=schedule,
+            raw_attendance=attendance,
             messages=prepared_messages,
             grades=prepared_grades,
             behavior=prepared_current_behavior,
@@ -365,6 +369,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             achievements=prepared_achievements,
             homework=prepared_homework,
             schedule=prepared_schedule,
+            attendance=prepared_attendance,
         )
 
         return result
@@ -379,6 +384,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         raw_achievements: list[dict[str, Any]] | None,
         raw_homework: list[Any] | None,
         raw_schedule: list[dict[str, Any]] | None,
+        raw_attendance: list[dict[str, Any]] | None,
         messages: list[dict[str, Any]],
         grades: list[dict[str, Any]],
         behavior: list[dict[str, Any]],
@@ -386,6 +392,7 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         achievements: list[dict[str, Any]],
         homework: list[dict[str, Any]],
         schedule: list[dict[str, Any]],
+        attendance: list[dict[str, Any]],
     ) -> None:
         """Pierwszy poprawny wynik zapamiętaj, kolejne zamień na zdarzenia."""
         messages_to_fire: list[dict[str, Any]] = []
@@ -469,6 +476,15 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     self._schedule_id(item) for item in schedule
                 )
                 self._initialized_sections.add("schedule")
+
+        if raw_attendance is not None:
+            if "attendance" in self._initialized_sections:
+                self._fire_new_unexcused_absence_events(attendance)
+            else:
+                self._seen_attendance_ids.update(
+                    attendance_id(item) for item in attendance
+                )
+                self._initialized_sections.add("attendance")
 
     @staticmethod
     def _prepare_messages(
@@ -643,6 +659,29 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "kategoria": item.get("kategoria", ""),
                     "termin": item.get("termin", ""),
                     "nauczyciel": item.get("nauczyciel", ""),
+                },
+            )
+
+    def _fire_new_unexcused_absence_events(
+        self, attendance: list[dict[str, Any]]
+    ) -> None:
+        """Wyślij event tylko dla nowego nieusprawiedliwionego wpisu."""
+        for item in attendance:
+            identifier = attendance_id(item)
+            if identifier in self._seen_attendance_ids:
+                continue
+            self._seen_attendance_ids.add(identifier)
+            if not is_unexcused_absence(item):
+                continue
+            self.hass.bus.async_fire(
+                EVENT_NEW_UNEXCUSED_ABSENCE,
+                {
+                    "data": item.get("data", ""),
+                    "przedmiot": item.get("przedmiot", ""),
+                    "godzina": item.get("godzina"),
+                    "nauczyciel": item.get("nauczyciel", ""),
+                    "symbol": item.get("symbol", ""),
+                    "typ": item.get("typ", ""),
                 },
             )
 
