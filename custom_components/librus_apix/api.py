@@ -624,9 +624,6 @@ class LibrusApiClient:
                             )
                             continue
 
-                        if not _is_grade(value):
-                            continue
-
                         result.append(
                             {
                                 "subject": subject,
@@ -638,7 +635,11 @@ class LibrusApiClient:
                                 "comment": description,
                                 "teacher": getattr(grade, "teacher", ""),
                                 "semester": grade.semester,
-                                "type": "descriptive",
+                                "type": (
+                                    "descriptive"
+                                    if _is_grade(value)
+                                    else "descriptive_text"
+                                ),
                             }
                         )
 
