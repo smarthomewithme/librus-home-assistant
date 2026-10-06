@@ -9,5 +9,8 @@
   "requirements": [
     "librus-apix==1.5.1"
   ],
-  "version": "1.7.0"
+  "version": "1.7.0",
+  "codeowners": [
+    "@smarthomewithme"
+  ]
 }
