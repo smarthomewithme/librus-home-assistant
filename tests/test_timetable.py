@@ -170,5 +170,31 @@ class ScheduleMatchingTests(unittest.TestCase):
         self.assertEqual(len(unmatched), 1)
 
 
+    def test_ignores_events_outside_requested_weeks(self) -> None:
+        lessons = [
+            {
+                "date": "2026-10-06",
+                "number": 2,
+                "subject": "Matematyka",
+                "active": True,
+            }
+        ]
+        events = [
+            {
+                "data": "2026-10-20",
+                "numer_lekcji": 2,
+                "przedmiot": "Matematyka",
+                "tytul": "Sprawdzian",
+            }
+        ]
+        enriched, unmatched = timetable.attach_schedule_events(
+            lessons,
+            events,
+            allowed_dates={"2026-10-05", "2026-10-06", "2026-10-07"},
+        )
+        self.assertEqual(enriched[0]["wydarzenia"], [])
+        self.assertEqual(unmatched, [])
+
+
 if __name__ == "__main__":
     unittest.main()
