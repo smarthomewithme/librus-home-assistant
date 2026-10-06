@@ -1,6 +1,9 @@
 {
   "domain": "librus_apix",
   "name": "Librus Synergia — Smart Home With Me",
+  "codeowners": [
+    "@smarthomewithme"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://www.smarthomewithme.com",
@@ -9,8 +12,5 @@
   "requirements": [
     "librus-apix==1.5.1"
   ],
-  "version": "1.7.0",
-  "codeowners": [
-    "@smarthomewithme"
-  ]
+  "version": "1.7.0"
 }
