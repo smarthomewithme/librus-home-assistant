@@ -13,6 +13,8 @@ from librus_apix.helpers import no_access_check
 from .api import (
     LibrusApiClient,
     _grade_comment,
+    _grade_counts_to_average,
+    _grade_weight,
     _is_behavior_subject,
     _is_grade,
     current_semester,
@@ -155,6 +157,8 @@ class SmartHomeLibrusApiClient(LibrusApiClient):
                                     or getattr(grade, "teacher", "")
                                 ),
                                 "semester": grade.semester,
+                                "weight": _grade_weight(grade),
+                                "counts_to_average": _grade_counts_to_average(grade),
                                 "type": entry_type,
                             }
                         )
@@ -188,9 +192,6 @@ class SmartHomeLibrusApiClient(LibrusApiClient):
                             )
                             continue
 
-                        if not _is_grade(value):
-                            continue
-
                         result.append(
                             {
                                 "subject": subject,
@@ -206,7 +207,11 @@ class SmartHomeLibrusApiClient(LibrusApiClient):
                                 "comment": description,
                                 "teacher": getattr(grade, "teacher", ""),
                                 "semester": grade.semester,
-                                "type": "descriptive",
+                                "type": (
+                                    "descriptive"
+                                    if _is_grade(value)
+                                    else "descriptive_text"
+                                ),
                             }
                         )
 

@@ -9,14 +9,31 @@
           "username": "Username",
           "password": "Password"
         }
+      },
+      "reconfigure": {
+        "title": "Update credentials",
+        "description": "Change the password for Librus account **{username}** without removing the integration or its entities.",
+        "data": {
+          "password": "New password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate Librus",
+        "description": "Librus rejected the saved credentials for **{username}**. Enter the current password.",
+        "data": {
+          "password": "Password"
+        }
       }
     },
     "error": {
       "cannot_connect": "Could not sign in to Librus. Check the credentials and Librus availability.",
-      "unknown": "An unexpected error occurred. Check the Home Assistant logs."
+      "unknown": "An unexpected error occurred. Check the Home Assistant logs.",
+      "invalid_auth": "Librus rejected the username or password."
     },
     "abort": {
-      "already_configured": "This Librus account is already configured."
+      "already_configured": "This Librus account is already configured.",
+      "reconfigure_successful": "The Librus credentials were updated.",
+      "reauth_successful": "The Librus credentials were updated."
     }
   },
   "options": {

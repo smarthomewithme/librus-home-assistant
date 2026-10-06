@@ -14,9 +14,16 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
+from .attendance import (
+    is_absence as _is_attendance_absence,
+    is_excused_absence as _is_excused_absence,
+    is_late as _is_attendance_late,
+    is_unexcused_absence as _is_unexcused_absence,
+)
 from .const import (
     ATTR_MESSAGE_INDEX,
     ATTR_SCHEDULE_INDEX,
@@ -26,8 +33,11 @@ from .const import (
 )
 from .coordinator import LibrusDataUpdateCoordinator
 from .entity import librus_device_info
+from .grade_math import average_grades as _srednia_ocen
 from .timetable import (
     active_lessons,
+    attach_schedule_events,
+    current_active_lesson,
     first_active_lesson,
     lessons_by_date,
     lessons_for_date,
@@ -38,24 +48,6 @@ from .timetable_coordinator import LibrusTimetableCoordinator
 
 _MESSAGE_SERVICE_REGISTERED = "_message_service_registered"
 _SCHEDULE_SERVICE_REGISTERED = "_schedule_service_registered"
-
-
-def _srednia_ocen(oceny: List[Dict]) -> Optional[float]:
-    """Oblicz srednia ocen z listy ocen."""
-    wartosci = []
-    for g in oceny:
-        grade_str = str(g.get("ocena", ""))
-        try:
-            base = float(grade_str[0])
-            if len(grade_str) > 1:
-                if "+" in grade_str:
-                    base += 0.5
-                elif "-" in grade_str:
-                    base -= 0.25
-            wartosci.append(base)
-        except (ValueError, IndexError):
-            continue
-    return round(sum(wartosci) / len(wartosci), 2) if wartosci else None
 
 
 async def async_setup_entry(
@@ -75,6 +67,7 @@ async def async_setup_entry(
         LibrusUczenSensor(coordinator, config_entry),
         LibrusSzczesliwyNumerekSensor(coordinator, config_entry),
         LibrusOcenySensor(coordinator, config_entry),
+        LibrusOcenyOpisoweSensor(coordinator, config_entry),
         LibrusZachowanieSensor(coordinator, config_entry),
         LibrusZachowanieBiezaceSensor(coordinator, config_entry),
         LibrusUwagiSensor(coordinator, config_entry),
@@ -83,9 +76,13 @@ async def async_setup_entry(
         LibrusZadaniaSensor(coordinator, config_entry),
         schedule_sensor,
         LibrusFrekwencjaSensor(coordinator, config_entry),
+        LibrusNieusprawiedliwioneNieobecnosciSensor(coordinator, config_entry),
         LibrusOgloszeniaSensor(coordinator, config_entry),
         LibrusSredniaOcenSensor(coordinator, config_entry),
-        LibrusPlanLekcjiSensor(timetable_coordinator, config_entry),
+        LibrusPlanLekcjiSensor(
+            timetable_coordinator, coordinator, config_entry
+        ),
+        LibrusAktualnaLekcjaSensor(timetable_coordinator, config_entry),
         LibrusNastepnaLekcjaSensor(timetable_coordinator, config_entry),
         LibrusStatusSensor(coordinator, timetable_coordinator, config_entry),
         LibrusOstatniaAktualizacjaSensor(coordinator, config_entry),
@@ -254,6 +251,41 @@ class LibrusOcenySensor(CoordinatorEntity, SensorEntity):
             "liczba_przedmiotow": len(oceny_wg_przedmiotu),
             "sa_nowe_oceny": sa_nowe,
             "semestr": data.get("semestr_biezacy"),
+        }
+
+
+class LibrusOcenyOpisoweSensor(CoordinatorEntity, SensorEntity):
+    """Nienumeryczne oceny opisowe, odseparowane od zwykłych ocen 1-6."""
+
+    def __init__(
+        self, coordinator: LibrusDataUpdateCoordinator, config_entry: ConfigEntry
+    ) -> None:
+        super().__init__(coordinator)
+        self._config_entry = config_entry
+        self._attr_has_entity_name = False
+        self._attr_name = "Oceny opisowe"
+        self._attr_unique_id = f"{config_entry.entry_id}_oceny_opisowe"
+        self._attr_icon = "mdi:text-box-check-outline"
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        return _device_info(self.coordinator, self._config_entry)
+
+    def _entries(self) -> list[dict[str, Any]]:
+        return list((self.coordinator.data or {}).get("oceny_opisowe", []))
+
+    @property
+    def native_value(self) -> int:
+        return len(self._entries())
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        entries = self._entries()
+        return {
+            "wpisy": entries,
+            "liczba_wpisow": len(entries),
+            "sa_nowe_wpisy": any(item.get("jest_nowa", False) for item in entries),
+            "semestr": (self.coordinator.data or {}).get("semestr_biezacy"),
         }
 
 
@@ -548,13 +580,23 @@ class LibrusSredniaOcenSensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         data = self.coordinator.data or {}
+        grouped = data.get("oceny_wg_przedmiotu", {})
         srednie_przedmiotow = {
             subject: _srednia_ocen(oceny)
-            for subject, oceny in data.get("oceny_wg_przedmiotu", {}).items()
+            for subject, oceny in grouped.items()
             if _srednia_ocen(oceny) is not None
         }
+        srednie_wazone_przedmiotow = {
+            subject: _srednia_ocen(oceny, weighted=True)
+            for subject, oceny in grouped.items()
+            if _srednia_ocen(oceny, weighted=True) is not None
+        }
+        wszystkie = [g for oceny in grouped.values() for g in oceny]
         return {
+            "srednia_arytmetyczna": _srednia_ocen(wszystkie),
+            "srednia_wazona": _srednia_ocen(wszystkie, weighted=True),
             "srednie_wg_przedmiotow": srednie_przedmiotow,
+            "srednie_wazone_wg_przedmiotow": srednie_wazone_przedmiotow,
             "semestr": data.get("semestr_biezacy"),
         }
 
@@ -596,6 +638,8 @@ class LibrusSredniaPrzedmiotuSensor(CoordinatorEntity, SensorEntity):
             "przedmiot": self._subject,
             "lista_ocen": ", ".join(g["ocena"] for g in oceny),
             "liczba_ocen": len(oceny),
+            "srednia_arytmetyczna": _srednia_ocen(oceny),
+            "srednia_wazona": _srednia_ocen(oceny, weighted=True),
         }
 
 
@@ -808,29 +852,93 @@ class LibrusFrekwencjaSensor(CoordinatorEntity, SensorEntity):
     def device_info(self) -> Dict[str, Any]:
         return _device_info(self.coordinator, self._config_entry)
 
-    @staticmethod
-    def _symbol(entry: Dict[str, Any]) -> str:
-        return str(entry.get("symbol", "") or "").strip().casefold()
-
     @property
     def native_value(self) -> int:
-        """Stan to liczba nieobecności, tak jak w dzienniku Librusa."""
+        """Stan pozostaje liczbą wszystkich nieobecności dla kompatybilności."""
         entries = (self.coordinator.data or {}).get("frekwencja", [])
-        return sum(1 for entry in entries if self._symbol(entry) in {"nb", "u"})
+        return sum(1 for entry in entries if _is_attendance_absence(entry))
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         entries = (self.coordinator.data or {}).get("frekwencja", [])
-        absences = [
-            entry for entry in entries if self._symbol(entry) in {"nb", "u"}
-        ]
-        late = [entry for entry in entries if self._symbol(entry) == "sp"]
+        absences = [entry for entry in entries if _is_attendance_absence(entry)]
+        excused = [entry for entry in absences if _is_excused_absence(entry)]
+        unexcused = [entry for entry in absences if _is_unexcused_absence(entry)]
+        late = [entry for entry in entries if _is_attendance_late(entry)]
+
+        by_subject: Dict[str, Dict[str, int]] = {}
+        for entry in entries:
+            subject = str(entry.get("przedmiot", "") or "Nieznany").strip()
+            bucket = by_subject.setdefault(
+                subject,
+                {
+                    "nieobecnosci": 0,
+                    "usprawiedliwione": 0,
+                    "nieusprawiedliwione": 0,
+                    "spoznienia": 0,
+                },
+            )
+            if _is_attendance_absence(entry):
+                bucket["nieobecnosci"] += 1
+                if _is_excused_absence(entry):
+                    bucket["usprawiedliwione"] += 1
+                else:
+                    bucket["nieusprawiedliwione"] += 1
+            if _is_attendance_late(entry):
+                bucket["spoznienia"] += 1
+
         return {
             "frekwencja": entries,
             "lista_wpisow": entries,
             "liczba_wpisow": len(entries),
             "liczba_nieobecnosci": len(absences),
+            "liczba_usprawiedliwionych": len(excused),
+            "liczba_nieusprawiedliwionych": len(unexcused),
             "liczba_spoznien": len(late),
+            "wg_przedmiotow": by_subject,
+        }
+
+
+class LibrusNieusprawiedliwioneNieobecnosciSensor(
+    CoordinatorEntity, SensorEntity
+):
+    """Lekka encja pokazująca wyłącznie nieusprawiedliwione nieobecności."""
+
+    def __init__(
+        self,
+        coordinator: LibrusDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+    ) -> None:
+        super().__init__(coordinator)
+        self._config_entry = config_entry
+        self._attr_has_entity_name = False
+        self._attr_name = "Nieusprawiedliwione nieobecności"
+        self._attr_unique_id = f"{config_entry.entry_id}_nieusprawiedliwione"
+        self._attr_icon = "mdi:account-alert-outline"
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        return _device_info(self.coordinator, self._config_entry)
+
+    def _entries(self) -> list[dict[str, Any]]:
+        entries = (self.coordinator.data or {}).get("frekwencja", [])
+        return [
+            entry
+            for entry in entries
+            if _is_unexcused_absence(entry)
+        ]
+
+    @property
+    def native_value(self) -> int:
+        return len(self._entries())
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        entries = self._entries()
+        return {
+            "ostatnie": list(reversed(entries))[:10],
+            "liczba_nieusprawiedliwionych": len(entries),
         }
 
 
@@ -1025,18 +1133,29 @@ class LibrusPlanLekcjiSensor(
             "lekcje_wg_daty",
             "aktywne_lekcje_wg_daty",
             "godziny_lekcji",
+            "lekcje_z_wydarzeniami",
+            "niedopasowane_wydarzenia",
         }
     )
 
     def __init__(
         self,
         coordinator: LibrusTimetableCoordinator,
+        main_coordinator: LibrusDataUpdateCoordinator,
         config_entry: ConfigEntry,
     ) -> None:
         """Zainicjalizuj czujnik."""
         super().__init__(coordinator)
+        self._main_coordinator = main_coordinator
         self._config_entry = config_entry
         self._attr_unique_id = f"{config_entry.entry_id}_timetable"
+
+    async def async_added_to_hass(self) -> None:
+        """Aktualizuj po zmianie planu albo terminarza."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            self._main_coordinator.async_add_listener(self.async_write_ha_state)
+        )
 
     @property
     def device_info(self) -> Dict[str, Any]:
@@ -1059,6 +1178,22 @@ class LibrusPlanLekcjiSensor(
         first_today = first_active_lesson(lessons, today)
         first_tomorrow = first_active_lesson(lessons, tomorrow)
         next_lesson = next_active_lesson(lessons, dt_util.now())
+        schedule = (self._main_coordinator.data or {}).get("terminarz", [])
+        allowed_schedule_dates: set[str] = set()
+        for raw_week_start in data.get("requested_week_starts", []):
+            try:
+                week_start = date.fromisoformat(str(raw_week_start))
+            except (TypeError, ValueError):
+                continue
+            allowed_schedule_dates.update(
+                (week_start + timedelta(days=offset)).isoformat()
+                for offset in range(7)
+            )
+        lessons_with_events, unmatched_events = attach_schedule_events(
+            lessons,
+            schedule,
+            allowed_dates=allowed_schedule_dates or None,
+        )
 
         return {
             "status_danych": data.get("source", "none"),
@@ -1100,6 +1235,92 @@ class LibrusPlanLekcjiSensor(
                 active_lessons(lessons), active_only=True
             ),
             "godziny_lekcji": timetable_hours(lessons),
+            "lekcje_z_wydarzeniami": lessons_with_events,
+            "niedopasowane_wydarzenia": unmatched_events,
+        }
+
+
+class LibrusAktualnaLekcjaSensor(
+    CoordinatorEntity[LibrusTimetableCoordinator], SensorEntity
+):
+    """Bieżąca lekcja jako natywna encja zamiast logiki w dashboardzie."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Aktualna lekcja"
+    _attr_icon = "mdi:clock-time-four-outline"
+
+    def __init__(
+        self,
+        coordinator: LibrusTimetableCoordinator,
+        config_entry: ConfigEntry,
+    ) -> None:
+        super().__init__(coordinator)
+        self._config_entry = config_entry
+        self._attr_unique_id = f"{config_entry.entry_id}_current_lesson"
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        return librus_device_info(self._config_entry)
+
+    def _lesson(self) -> Dict[str, Any] | None:
+        data = self.coordinator.data or {}
+        return current_active_lesson(data.get("lessons", []), dt_util.now())
+
+    async def async_added_to_hass(self) -> None:
+        """Odśwież stan co minutę także bez pobierania nowego planu."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_interval(
+                self.hass,
+                lambda _now: self.async_write_ha_state(),
+                timedelta(minutes=1),
+            )
+        )
+
+    @property
+    def native_value(self) -> str | None:
+        lesson = self._lesson()
+        if not lesson:
+            return None
+        return str(lesson.get("subject", "") or "").strip() or None
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        data = self.coordinator.data or {}
+        lesson = self._lesson()
+        if not lesson:
+            return {
+                "lekcja": None,
+                "minut_do_konca": None,
+                "status_danych": data.get("source", "none"),
+                "dane_aktualne": data.get("fresh", False),
+                "ostatnia_poprawna_aktualizacja": data.get("last_successful_update"),
+                "ostatni_blad": data.get("last_error"),
+            }
+
+        minutes_left: int | None = None
+        try:
+            end = datetime.fromisoformat(f"{lesson['date']}T{lesson['end']}")
+            now = dt_util.now()
+            comparison_now = now.replace(tzinfo=None) if now.tzinfo else now
+            minutes_left = max(0, int((end - comparison_now).total_seconds() // 60))
+        except (KeyError, TypeError, ValueError):
+            pass
+
+        return {
+            "lekcja": lesson,
+            "przedmiot": lesson.get("subject"),
+            "od": lesson.get("start"),
+            "do": lesson.get("end"),
+            "nauczyciel": lesson.get("teacher"),
+            "sala": lesson.get("room"),
+            "numer_lekcji": lesson.get("number"),
+            "zastepstwo": lesson.get("changed", False),
+            "minut_do_konca": minutes_left,
+            "status_danych": data.get("source", "none"),
+            "dane_aktualne": data.get("fresh", False),
+            "ostatnia_poprawna_aktualizacja": data.get("last_successful_update"),
+            "ostatni_blad": data.get("last_error"),
         }
 
 
@@ -1127,6 +1348,17 @@ class LibrusNastepnaLekcjaSensor(
     def device_info(self) -> Dict[str, Any]:
         """Powiaz czujnik z urzadzeniem ucznia."""
         return librus_device_info(self._config_entry)
+
+    async def async_added_to_hass(self) -> None:
+        """Przelicz najbliższą lekcję co minutę bez dodatkowego requestu."""
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            async_track_time_interval(
+                self.hass,
+                lambda _now: self.async_write_ha_state(),
+                timedelta(minutes=1),
+            )
+        )
 
     @property
     def native_value(self) -> datetime | None:

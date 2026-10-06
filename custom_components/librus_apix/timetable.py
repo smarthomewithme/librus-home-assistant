@@ -225,6 +225,23 @@ def first_active_lesson(
     return day[0] if day else None
 
 
+def current_active_lesson(
+    lessons: Iterable[Mapping[str, Any]], now: datetime
+) -> dict[str, Any] | None:
+    """Zwróć aktywną lekcję trwającą dokładnie w tej chwili."""
+    comparison_now = now.replace(tzinfo=None) if now.tzinfo else now
+    candidates: list[tuple[datetime, dict[str, Any]]] = []
+    for lesson in active_lessons(lessons):
+        try:
+            start = datetime.fromisoformat(f"{lesson['date']}T{lesson['start']}")
+            end = datetime.fromisoformat(f"{lesson['date']}T{lesson['end']}")
+        except (KeyError, TypeError, ValueError):
+            continue
+        if start <= comparison_now < end:
+            candidates.append((start, lesson))
+    return min(candidates, key=lambda item: item[0])[1] if candidates else None
+
+
 def next_active_lesson(
     lessons: Iterable[Mapping[str, Any]], now: datetime
 ) -> dict[str, Any] | None:
@@ -240,6 +257,87 @@ def next_active_lesson(
         if end > comparison_now:
             candidates.append((start, lesson))
     return min(candidates, key=lambda item: item[0])[1] if candidates else None
+
+
+def attach_schedule_events(
+    lessons: Iterable[Mapping[str, Any]],
+    events: Iterable[Mapping[str, Any]],
+    *,
+    allowed_dates: Iterable[str] | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Powiąż terminarz z planem bez zgadywania przy niejednoznacznych danych.
+
+    Reguły są celowo deterministyczne:
+    1. data musi być identyczna,
+    2. numer lekcji ma pierwszeństwo,
+    3. bez numeru dopasowujemy tylko jednoznaczny przedmiot tego dnia,
+    4. niejednoznaczne wpisy zostają na liście niedopasowanych.
+    """
+    enriched = [dict(lesson) for lesson in lessons]
+    for lesson in enriched:
+        lesson["wydarzenia"] = []
+
+    unmatched: list[dict[str, Any]] = []
+    allowed = set(allowed_dates) if allowed_dates is not None else None
+    by_date: dict[str, list[dict[str, Any]]] = {}
+    for lesson in enriched:
+        lesson_date = str(lesson.get("date", "") or "")
+        if lesson_date:
+            by_date.setdefault(lesson_date, []).append(lesson)
+
+    for raw_event in events:
+        event = dict(raw_event)
+        event_date = str(event.get("data", "") or "")
+        if allowed is not None and event_date not in allowed:
+            continue
+        candidates = by_date.get(event_date, [])
+        if not candidates:
+            unmatched.append(event)
+            continue
+
+        number_raw = event.get("numer_lekcji")
+        try:
+            number = int(number_raw) if number_raw not in (None, "") else None
+        except (TypeError, ValueError):
+            number = None
+
+        picked: dict[str, Any] | None = None
+        if number is not None:
+            numbered = [
+                lesson
+                for lesson in candidates
+                if int(lesson.get("number", 0) or 0) == number
+            ]
+            if len(numbered) == 1:
+                picked = numbered[0]
+            elif len(numbered) > 1:
+                event_subject = _plain_text(event.get("przedmiot", ""))
+                subject_matches = [
+                    lesson
+                    for lesson in numbered
+                    if event_subject
+                    and _plain_text(lesson.get("subject", "")) == event_subject
+                ]
+                if len(subject_matches) == 1:
+                    picked = subject_matches[0]
+
+        if picked is None and number is None:
+            event_subject = _plain_text(event.get("przedmiot", ""))
+            if event_subject:
+                subject_matches = [
+                    lesson
+                    for lesson in candidates
+                    if _plain_text(lesson.get("subject", "")) == event_subject
+                ]
+                if len(subject_matches) == 1:
+                    picked = subject_matches[0]
+
+        if picked is None:
+            unmatched.append(event)
+            continue
+        picked["wydarzenia"].append(event)
+
+    return enriched, unmatched
 
 
 def timetable_hours(lessons: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, str]]:

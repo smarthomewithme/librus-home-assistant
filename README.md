@@ -1,7 +1,7 @@
 # Librus Synergia — Smart Home With Me
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-custom%20integration-41BDF5)](https://www.home-assistant.io/)
-![Version](https://img.shields.io/badge/version-1.7.0-blue)
+![Version](https://img.shields.io/badge/version-1.8.0--beta.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 Unofficial **Librus Synergia integration for Home Assistant**, developed and maintained by **Smart Home With Me**.
@@ -34,7 +34,7 @@ Copy `custom_components/librus_apix` into `/config/custom_components/librus_apix
 
 ## What the integration can do
 
-Version **1.7.0** turns Librus into a complete school-data source for Home Assistant rather than a simple grade sensor.
+Version **1.8.0-beta.1** continues moving dashboard logic into native Home Assistant entities while keeping the existing 1.7.x entity IDs and read-state model compatible.
 
 ### Persistent read state — added in v1.7.0
 
@@ -70,14 +70,17 @@ Each supported item exposes a stable local `id` plus `odczytana` / `nieodczytana
 - full grade list in attributes,
 - grade categories,
 - teacher comments,
-- overall average,
-- per-subject averages,
+- overall arithmetic average,
+- weighted average from Librus grade weights,
+- per-subject arithmetic and weighted averages,
 - dynamic subject sensors,
 - new subjects can appear without restarting Home Assistant.
 
 Version 1.7.0 also preserves the Librus grade-detail link. Non-standard grade markers such as `T` can therefore be resolved through the grade detail page instead of being shown as an unexplained letter. For point-based diagnostic tests the integration keeps the raw marker and exposes the point breakdown, with a compact display such as `T · 15/21 pkt` when Librus provides `Suma punktów`.
 
 Behaviour values are kept separate from normal grades and are not included in grade averages.
+
+Non-numeric descriptive assessments returned by Librus are preserved in a separate **Descriptive grades** sensor, so schools using descriptive grading do not lose those entries and they do not distort numeric averages.
 
 ### Student information
 
@@ -158,8 +161,15 @@ data:
 
 - full attendance entries,
 - absence count,
-- lateness count,
+- excused and unexcused absence counts,
+- dedicated **Unexcused absences** sensor,
+- releases and lateness,
+- per-subject absence breakdown,
 - automation-ready attributes.
+
+The integration does not invent a percentage when the legacy attendance feed does not provide a reliable denominator of all lessons.
+
+After the first successful attendance read establishes a baseline, a newly detected unexcused absence also emits `librus_apix_nowa_nieusprawiedliwiona_nieobecnosc` for notifications and Node-RED automations.
 
 ### Announcements
 
@@ -177,7 +187,10 @@ data:
 - active lessons today,
 - local read-only Home Assistant calendar,
 - `pierwsza_lekcja_dzis_start` for alarm automations,
-- dedicated **Next lesson** timestamp sensor.
+- dedicated **Current lesson** sensor recalculated locally every minute,
+- dedicated **Next lesson** timestamp sensor recalculated locally every minute,
+- deterministic matching of school-calendar entries to timetable lessons,
+- ambiguous events remain available as `niedopasowane_wydarzenia` instead of being attached to a guessed lesson.
 
 ### Adaptive refresh
 
@@ -210,13 +223,19 @@ Useful timetable diagnostics include `status_danych`, `dane_aktualne`, `ostatnia
 
 The integration includes a dedicated **Status** sensor with states `ok`, `ostrzezenie` and `blad`. It also exposes the last successful main-data update, refresh mode, current refresh interval, timetable source/cache information and partial failure details.
 
+Version 1.8 also adds Home Assistant's native **Download diagnostics** output. It contains technical health/cache information only and deliberately excludes grades, messages, notes and other student content.
+
 ### Automation-ready entities
 
-Depending on available Librus data, the integration provides binary sensors for new messages, new grades, new behaviour entries, new notes, upcoming calendar entries and homework due today/overdue. It also emits Home Assistant events for newly detected grades, behaviour, messages, homework, calendar entries, notes and special achievements.
+Depending on available Librus data, the integration provides binary sensors for new messages, new grades, new behaviour entries, new notes, upcoming calendar entries and homework due today/overdue. It also emits Home Assistant events for newly detected grades, behaviour, messages, homework, calendar entries, notes, special achievements and newly detected unexcused absences.
 
 ### Manual controls
 
 Two buttons are available: **Refresh all data** and **Refresh timetable**.
+
+The integration can also be **reconfigured** from Home Assistant to update the Librus password without deleting the integration entry or losing entity IDs.
+
+If Librus explicitly rejects the stored credentials, Home Assistant starts its normal **reauthentication** flow automatically. Temporary connection failures or Librus maintenance are kept separate and do not trigger a misleading password prompt.
 
 ### Multiple students
 
@@ -233,6 +252,7 @@ Exact `entity_id` values depend on the student name and the existing Home Assist
 | sensor | Student information | Student and class details |
 | sensor | Lucky number | Daily lucky number |
 | sensor | Grades | Grade count and full grade list |
+| sensor | Descriptive grades | Non-numeric descriptive assessments |
 | sensor | Classification behaviour | Semester/year behaviour grade |
 | sensor | Current behaviour | Live behaviour entries |
 | sensor | Notes | Notes from Student → Notes |
@@ -242,8 +262,10 @@ Exact `entity_id` values depend on the student name and the existing Home Assist
 | sensor | Homework | Upcoming homework |
 | sensor | Calendar | Upcoming school events |
 | sensor | Attendance | Absences and full attendance data |
+| sensor | Unexcused absences | Count and recent entries requiring attention |
 | sensor | Announcements | School announcements |
-| sensor | Timetable | Active lessons today |
+| sensor | Timetable | Active lessons today plus matched calendar events |
+| sensor | Current lesson | Subject currently in progress |
 | sensor | Next lesson | Timestamp of next lesson |
 | sensor | Status | Integration health and diagnostics |
 | sensor | Last successful update | Last successful main-data refresh |
@@ -284,7 +306,8 @@ The integration runs inside your Home Assistant instance.
 
 ## Version
 
-Current stable version: **1.7.0**
+Development preview on this branch: **1.8.0-beta.1**  
+Current stable release on `main`: **1.7.0**
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete development history.
 

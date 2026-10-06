@@ -12,7 +12,7 @@ from typing import Any, TypeVar
 from bs4 import BeautifulSoup, Tag
 
 from librus_apix.client import Client, new_client
-from librus_apix.exceptions import TokenError
+from librus_apix.exceptions import AuthorizationError, TokenError
 from librus_apix.helpers import no_access_check
 
 _LOGGER = logging.getLogger(__name__)
@@ -77,6 +77,72 @@ def _comment_from_description(description: str) -> str:
 def _grade_comment(grade: Any) -> str:
     """Zwróć faktyczną treść komentarza nauczyciela, nie znacznik ``K``."""
     return _comment_from_description(str(getattr(grade, "desc", "") or ""))
+
+
+def _grade_metadata_value(description: str, *labels: str) -> str:
+    """Odczytaj pojedynczą wartość z metadanych tooltipu oceny."""
+    wanted = tuple(label.casefold().rstrip(":") for label in labels)
+    for line in str(description or "").replace("\r", "").split("\n"):
+        raw = line.strip()
+        if ":" not in raw:
+            continue
+        key, value = raw.split(":", 1)
+        if key.strip().casefold() in wanted:
+            return value.strip()
+    return ""
+
+
+def _grade_weight(grade: Any) -> float | None:
+    """Odczytaj wagę z obiektu librus-apix, z fallbackiem do tooltipu."""
+    direct = getattr(grade, "weight", None)
+    if direct not in (None, ""):
+        try:
+            value = float(direct)
+        except (TypeError, ValueError):
+            value = 0.0
+        if value > 0:
+            return value
+
+    description = str(getattr(grade, "desc", "") or "")
+    raw = _grade_metadata_value(description, "waga", "weight").replace(",", ".")
+    if not raw:
+        return None
+    match = re.search(r"-?\d+(?:\.\d+)?", raw)
+    if not match:
+        return None
+    try:
+        value = float(match.group(0))
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
+def _grade_counts_to_average(grade: Any) -> bool | None:
+    """Zwróć flagę counts librus-apix, z fallbackiem do tooltipu."""
+    direct = getattr(grade, "counts", None)
+    if isinstance(direct, bool):
+        return direct
+    if direct not in (None, ""):
+        normalized = str(direct).strip().casefold()
+        if normalized in {"tak", "yes", "true", "1"}:
+            return True
+        if normalized in {"nie", "no", "false", "0"}:
+            return False
+
+    description = str(getattr(grade, "desc", "") or "")
+    raw = _grade_metadata_value(
+        description,
+        "licz do średniej",
+        "licz do sredniej",
+        "counts toward average",
+    ).casefold()
+    if not raw:
+        return None
+    if raw in {"tak", "yes", "true", "1"}:
+        return True
+    if raw in {"nie", "no", "false", "0"}:
+        return False
+    return None
 
 
 def _comment_path(cell: Tag) -> str:
@@ -410,6 +476,8 @@ class LibrusApiClient:
         self._auth_lock = asyncio.Lock()
         self._request_lock = asyncio.Lock()
         self._auth_retry_after = 0.0
+        self._authorization_failed = False
+        self._reauth_requested = False
 
     async def _run_blocking(self, function: Callable[..., _ResultT], *args: Any) -> _ResultT:
         """Wykonaj blokujące wywołanie biblioteki poza pętlą HA."""
@@ -422,6 +490,15 @@ class LibrusApiClient:
         self._client = None
         self._token = None
         self._auth_retry_after = 0.0
+
+    @property
+    def needs_reauth(self) -> bool:
+        """Czy Librus jawnie odrzucił dane logowania i HA nie pokazał jeszcze flow."""
+        return self._authorization_failed and not self._reauth_requested
+
+    def mark_reauth_requested(self) -> None:
+        """Nie uruchamiaj kilku równoległych flow reautoryzacji."""
+        self._reauth_requested = True
 
     async def async_authenticate(self) -> bool:
         """Utwórz sesję i pobierz token Librusa."""
@@ -441,14 +518,23 @@ class LibrusApiClient:
                 )
                 if not token:
                     raise ValueError("Librus nie zwrócił tokenu logowania")
-            except Exception as err:  # biblioteka zgłasza kilka typów błędów sieci
+            except AuthorizationError as err:
                 self._reset_authentication()
+                self._authorization_failed = True
+                self._auth_retry_after = loop.time() + 30
+                _LOGGER.warning("Librus odrzucił dane logowania: %s", err)
+                return False
+            except Exception as err:  # awaria sieci/serwisu nie oznacza złego hasła
+                self._reset_authentication()
+                self._authorization_failed = False
                 self._auth_retry_after = loop.time() + 30
                 _LOGGER.warning("Logowanie do Librusa nie powiodło się: %s", err)
                 return False
 
             self._client = client
             self._token = token
+            self._authorization_failed = False
+            self._reauth_requested = False
             self._auth_retry_after = 0.0
             return True
 
@@ -524,6 +610,8 @@ class LibrusApiClient:
                                 "comment": _grade_comment(grade),
                                 "teacher": getattr(grade, "teacher", ""),
                                 "semester": grade.semester,
+                                "weight": _grade_weight(grade),
+                                "counts_to_average": _grade_counts_to_average(grade),
                                 "type": entry_type,
                             }
                         )
@@ -556,9 +644,6 @@ class LibrusApiClient:
                             )
                             continue
 
-                        if not _is_grade(value):
-                            continue
-
                         result.append(
                             {
                                 "subject": subject,
@@ -570,7 +655,11 @@ class LibrusApiClient:
                                 "comment": description,
                                 "teacher": getattr(grade, "teacher", ""),
                                 "semester": grade.semester,
-                                "type": "descriptive",
+                                "type": (
+                                    "descriptive"
+                                    if _is_grade(value)
+                                    else "descriptive_text"
+                                ),
                             }
                         )
 

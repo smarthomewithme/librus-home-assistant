@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.8.0-beta.1
+
+- Added native **Current lesson** sensor with subject, period, teacher, classroom, substitution flag and minutes remaining. The sensor recalculates locally every minute without additional Librus requests.
+- Existing **Next lesson** sensor now also recalculates locally every minute, so lesson boundaries do not wait for the next timetable download.
+- Added deterministic school-calendar → timetable matching. Events are attached only when the date and lesson number match, or when a missing lesson number still leaves one unambiguous subject match; ambiguous items remain explicitly unmatched instead of being guessed.
+- Added Librus grade **weight** and **counts toward average** metadata using native librus-apix fields with a tooltip fallback.
+- Added weighted-average attributes globally and per subject while keeping the existing arithmetic-average sensor state for backwards compatibility.
+- Grades explicitly marked by Librus as not counting toward the average are excluded from both arithmetic and weighted calculations.
+- Expanded attendance data with excused/unexcused counts, releases, lateness and per-subject absence breakdowns.
+- Added a dedicated **Unexcused absences** sensor with recent entries.
+- Added `librus_apix_nowa_nieusprawiedliwiona_nieobecnosc`, emitted only for genuinely new unexcused attendance entries after the initial baseline.
+- Added a dedicated **Descriptive grades** sensor for non-numeric descriptive assessments returned by Librus; these entries stay separate from numeric averages and normal-grade events.
+- Added privacy-safe Home Assistant **Download diagnostics** support. Diagnostics intentionally exclude grades, messages, notes and other student content.
+- Added **Reconfigure** flow for changing the Librus password without deleting the config entry, entity IDs or dashboard references.
+- Added automatic Home Assistant **Reauthentication** when Librus explicitly rejects stored credentials; network errors and Librus maintenance do not trigger a false password prompt.
+- Added CI validation: Python compilation, pure timetable unit tests, Home Assistant hassfest and HACS validation.
+- Added pure unit tests for current-lesson detection, calendar-to-lesson matching, weighted grade math and attendance classification.
+- No Weekly AI Summary was added in this release.
+
 ## 1.7.0
 
 - Added persistent read acknowledgements stored internally by the integration for grades, calendar entries, homework, current behaviour and notes; no `input_text` helper is required.

@@ -20,6 +20,7 @@ from homeassistant.helpers.selector import (
 )
 
 from librus_apix.client import new_client
+from librus_apix.exceptions import AuthorizationError, MaintananceError
 
 from .const import (
     CONF_DATA_REFRESH_INTERVAL,
@@ -81,9 +82,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             try:
                 await validate_input(self.hass, user_input)
-            except (OSError, ValueError):
+            except AuthorizationError:
+                errors["base"] = "invalid_auth"
+            except (MaintananceError, OSError, ValueError):
                 errors["base"] = "cannot_connect"
-            except Exception:  # biblioteka nie ma wspólnej klasy błędów logowania
+            except Exception:
                 _LOGGER.exception("Nieoczekiwany błąd podczas logowania do Librusa")
                 errors["base"] = "unknown"
             else:
@@ -98,6 +101,95 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=LOGIN_SCHEMA,
             errors=errors,
+        )
+
+    async def async_step_reauth(self, _entry_data: dict[str, Any]):
+        """Rozpocznij reautoryzację po jawnym odrzuceniu danych przez Librusa."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ):
+        """Poproś wyłącznie o nowe hasło i zachowaj istniejące encje."""
+        entry = self._get_reauth_entry()
+        username = str(entry.data.get(CONF_USERNAME, ""))
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            data = {
+                CONF_USERNAME: username,
+                CONF_PASSWORD: user_input[CONF_PASSWORD],
+            }
+            try:
+                await validate_input(self.hass, data)
+            except AuthorizationError:
+                errors["base"] = "invalid_auth"
+            except (MaintananceError, OSError, ValueError):
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception(
+                    "Nieoczekiwany błąd podczas reautoryzacji Librusa"
+                )
+                errors["base"] = "unknown"
+            else:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
+                    reason="reauth_successful",
+                )
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_PASSWORD): str,
+                }
+            ),
+            errors=errors,
+            description_placeholders={"username": username},
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ):
+        """Pozwól zmienić hasło bez usuwania konta i encji."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            data = {
+                CONF_USERNAME: entry.data[CONF_USERNAME],
+                CONF_PASSWORD: user_input[CONF_PASSWORD],
+            }
+            try:
+                await validate_input(self.hass, data)
+            except AuthorizationError:
+                errors["base"] = "invalid_auth"
+            except (MaintananceError, OSError, ValueError):
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception(
+                    "Nieoczekiwany błąd podczas ponownej konfiguracji Librusa"
+                )
+                errors["base"] = "unknown"
+            else:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]},
+                    reason="reconfigure_successful",
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_PASSWORD): str,
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "username": str(entry.data.get(CONF_USERNAME, "")),
+            },
         )
 
     @staticmethod
