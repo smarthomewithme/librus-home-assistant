@@ -28,6 +28,7 @@ from .coordinator import LibrusDataUpdateCoordinator
 from .entity import librus_device_info
 from .timetable import (
     active_lessons,
+    current_active_lesson,
     first_active_lesson,
     lessons_by_date,
     lessons_for_date,
@@ -40,22 +41,47 @@ _MESSAGE_SERVICE_REGISTERED = "_message_service_registered"
 _SCHEDULE_SERVICE_REGISTERED = "_schedule_service_registered"
 
 
-def _srednia_ocen(oceny: List[Dict]) -> Optional[float]:
-    """Oblicz srednia ocen z listy ocen."""
-    wartosci = []
-    for g in oceny:
-        grade_str = str(g.get("ocena", ""))
-        try:
-            base = float(grade_str[0])
-            if len(grade_str) > 1:
-                if "+" in grade_str:
-                    base += 0.5
-                elif "-" in grade_str:
-                    base -= 0.25
-            wartosci.append(base)
-        except (ValueError, IndexError):
+def _wartosc_oceny(grade: Any) -> Optional[float]:
+    """Zamień typową ocenę 1-6 (+/-) na liczbę; pomiń kody i punktację."""
+    raw = str(grade or "").strip()
+    if not raw or raw[0] not in "123456":
+        return None
+    try:
+        base = float(raw[0])
+    except ValueError:
+        return None
+    if "+" in raw[1:]:
+        base += 0.5
+    elif "-" in raw[1:]:
+        base -= 0.25
+    return base
+
+
+def _srednia_ocen(
+    oceny: List[Dict], *, weighted: bool = False
+) -> Optional[float]:
+    """Oblicz średnią arytmetyczną albo ważoną bez zgadywania brakujących wag."""
+    suma = 0.0
+    mianownik = 0.0
+    for grade in oceny:
+        if grade.get("counts_to_average") is False:
             continue
-    return round(sum(wartosci) / len(wartosci), 2) if wartosci else None
+        value = _wartosc_oceny(grade.get("ocena", ""))
+        if value is None:
+            continue
+        if weighted:
+            raw_weight = grade.get("weight")
+            try:
+                weight = float(raw_weight) if raw_weight not in (None, "") else 1.0
+            except (TypeError, ValueError):
+                weight = 1.0
+            if weight <= 0:
+                weight = 1.0
+        else:
+            weight = 1.0
+        suma += value * weight
+        mianownik += weight
+    return round(suma / mianownik, 2) if mianownik else None
 
 
 async def async_setup_entry(
@@ -83,9 +109,11 @@ async def async_setup_entry(
         LibrusZadaniaSensor(coordinator, config_entry),
         schedule_sensor,
         LibrusFrekwencjaSensor(coordinator, config_entry),
+        LibrusNieusprawiedliwioneNieobecnosciSensor(coordinator, config_entry),
         LibrusOgloszeniaSensor(coordinator, config_entry),
         LibrusSredniaOcenSensor(coordinator, config_entry),
         LibrusPlanLekcjiSensor(timetable_coordinator, config_entry),
+        LibrusAktualnaLekcjaSensor(timetable_coordinator, config_entry),
         LibrusNastepnaLekcjaSensor(timetable_coordinator, config_entry),
         LibrusStatusSensor(coordinator, timetable_coordinator, config_entry),
         LibrusOstatniaAktualizacjaSensor(coordinator, config_entry),
@@ -548,13 +576,23 @@ class LibrusSredniaOcenSensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         data = self.coordinator.data or {}
+        grouped = data.get("oceny_wg_przedmiotu", {})
         srednie_przedmiotow = {
             subject: _srednia_ocen(oceny)
-            for subject, oceny in data.get("oceny_wg_przedmiotu", {}).items()
+            for subject, oceny in grouped.items()
             if _srednia_ocen(oceny) is not None
         }
+        srednie_wazone_przedmiotow = {
+            subject: _srednia_ocen(oceny, weighted=True)
+            for subject, oceny in grouped.items()
+            if _srednia_ocen(oceny, weighted=True) is not None
+        }
+        wszystkie = [g for oceny in grouped.values() for g in oceny]
         return {
+            "srednia_arytmetyczna": _srednia_ocen(wszystkie),
+            "srednia_wazona": _srednia_ocen(wszystkie, weighted=True),
             "srednie_wg_przedmiotow": srednie_przedmiotow,
+            "srednie_wazone_wg_przedmiotow": srednie_wazone_przedmiotow,
             "semestr": data.get("semestr_biezacy"),
         }
 
@@ -596,6 +634,8 @@ class LibrusSredniaPrzedmiotuSensor(CoordinatorEntity, SensorEntity):
             "przedmiot": self._subject,
             "lista_ocen": ", ".join(g["ocena"] for g in oceny),
             "liczba_ocen": len(oceny),
+            "srednia_arytmetyczna": _srednia_ocen(oceny),
+            "srednia_wazona": _srednia_ocen(oceny, weighted=True),
         }
 
 
@@ -812,25 +852,127 @@ class LibrusFrekwencjaSensor(CoordinatorEntity, SensorEntity):
     def _symbol(entry: Dict[str, Any]) -> str:
         return str(entry.get("symbol", "") or "").strip().casefold()
 
+    @staticmethod
+    def _type(entry: Dict[str, Any]) -> str:
+        return str(entry.get("typ", "") or "").strip().casefold()
+
+    @classmethod
+    def _is_late(cls, entry: Dict[str, Any]) -> bool:
+        symbol = cls._symbol(entry)
+        entry_type = cls._type(entry)
+        return symbol == "sp" or "spóź" in entry_type or "spoz" in entry_type
+
+    @classmethod
+    def _is_absence(cls, entry: Dict[str, Any]) -> bool:
+        symbol = cls._symbol(entry)
+        entry_type = cls._type(entry)
+        return (
+            symbol in {"nb", "u"}
+            or "nieobec" in entry_type
+            or "absence" in entry_type
+        )
+
+    @classmethod
+    def _is_excused_absence(cls, entry: Dict[str, Any]) -> bool:
+        if not cls._is_absence(entry):
+            return False
+        symbol = cls._symbol(entry)
+        entry_type = cls._type(entry)
+        if "nieuspraw" in entry_type:
+            return False
+        return symbol == "u" or "uspraw" in entry_type or "excused" in entry_type
+
+    @classmethod
+    def _is_unexcused_absence(cls, entry: Dict[str, Any]) -> bool:
+        return cls._is_absence(entry) and not cls._is_excused_absence(entry)
+
     @property
     def native_value(self) -> int:
-        """Stan to liczba nieobecności, tak jak w dzienniku Librusa."""
+        """Stan pozostaje liczbą wszystkich nieobecności dla kompatybilności."""
         entries = (self.coordinator.data or {}).get("frekwencja", [])
-        return sum(1 for entry in entries if self._symbol(entry) in {"nb", "u"})
+        return sum(1 for entry in entries if self._is_absence(entry))
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         entries = (self.coordinator.data or {}).get("frekwencja", [])
-        absences = [
-            entry for entry in entries if self._symbol(entry) in {"nb", "u"}
-        ]
-        late = [entry for entry in entries if self._symbol(entry) == "sp"]
+        absences = [entry for entry in entries if self._is_absence(entry)]
+        excused = [entry for entry in absences if self._is_excused_absence(entry)]
+        unexcused = [entry for entry in absences if self._is_unexcused_absence(entry)]
+        late = [entry for entry in entries if self._is_late(entry)]
+
+        by_subject: Dict[str, Dict[str, int]] = {}
+        for entry in entries:
+            subject = str(entry.get("przedmiot", "") or "Nieznany").strip()
+            bucket = by_subject.setdefault(
+                subject,
+                {
+                    "nieobecnosci": 0,
+                    "usprawiedliwione": 0,
+                    "nieusprawiedliwione": 0,
+                    "spoznienia": 0,
+                },
+            )
+            if self._is_absence(entry):
+                bucket["nieobecnosci"] += 1
+                if self._is_excused_absence(entry):
+                    bucket["usprawiedliwione"] += 1
+                else:
+                    bucket["nieusprawiedliwione"] += 1
+            if self._is_late(entry):
+                bucket["spoznienia"] += 1
+
         return {
             "frekwencja": entries,
             "lista_wpisow": entries,
             "liczba_wpisow": len(entries),
             "liczba_nieobecnosci": len(absences),
+            "liczba_usprawiedliwionych": len(excused),
+            "liczba_nieusprawiedliwionych": len(unexcused),
             "liczba_spoznien": len(late),
+            "wg_przedmiotow": by_subject,
+        }
+
+
+class LibrusNieusprawiedliwioneNieobecnosciSensor(
+    CoordinatorEntity, SensorEntity
+):
+    """Lekka encja pokazująca wyłącznie nieusprawiedliwione nieobecności."""
+
+    def __init__(
+        self,
+        coordinator: LibrusDataUpdateCoordinator,
+        config_entry: ConfigEntry,
+    ) -> None:
+        super().__init__(coordinator)
+        self._config_entry = config_entry
+        self._attr_has_entity_name = False
+        self._attr_name = "Nieusprawiedliwione nieobecności"
+        self._attr_unique_id = f"{config_entry.entry_id}_nieusprawiedliwione"
+        self._attr_icon = "mdi:account-alert-outline"
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        return _device_info(self.coordinator, self._config_entry)
+
+    def _entries(self) -> list[dict[str, Any]]:
+        entries = (self.coordinator.data or {}).get("frekwencja", [])
+        return [
+            entry
+            for entry in entries
+            if LibrusFrekwencjaSensor._is_unexcused_absence(entry)
+        ]
+
+    @property
+    def native_value(self) -> int:
+        return len(self._entries())
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        entries = self._entries()
+        return {
+            "ostatnie": list(reversed(entries))[:10],
+            "liczba_nieusprawiedliwionych": len(entries),
         }
 
 
@@ -1100,6 +1242,77 @@ class LibrusPlanLekcjiSensor(
                 active_lessons(lessons), active_only=True
             ),
             "godziny_lekcji": timetable_hours(lessons),
+        }
+
+
+class LibrusAktualnaLekcjaSensor(
+    CoordinatorEntity[LibrusTimetableCoordinator], SensorEntity
+):
+    """Bieżąca lekcja jako natywna encja zamiast logiki w dashboardzie."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Aktualna lekcja"
+    _attr_icon = "mdi:clock-time-four-outline"
+
+    def __init__(
+        self,
+        coordinator: LibrusTimetableCoordinator,
+        config_entry: ConfigEntry,
+    ) -> None:
+        super().__init__(coordinator)
+        self._config_entry = config_entry
+        self._attr_unique_id = f"{config_entry.entry_id}_current_lesson"
+
+    @property
+    def device_info(self) -> Dict[str, Any]:
+        return librus_device_info(self._config_entry)
+
+    def _lesson(self) -> Dict[str, Any] | None:
+        data = self.coordinator.data or {}
+        return current_active_lesson(data.get("lessons", []), dt_util.now())
+
+    @property
+    def native_value(self) -> str | None:
+        lesson = self._lesson()
+        return str(lesson.get("subject", "") or "") or None if lesson else None
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        data = self.coordinator.data or {}
+        lesson = self._lesson()
+        if not lesson:
+            return {
+                "lekcja": None,
+                "minut_do_konca": None,
+                "status_danych": data.get("source", "none"),
+                "dane_aktualne": data.get("fresh", False),
+                "ostatnia_poprawna_aktualizacja": data.get("last_successful_update"),
+                "ostatni_blad": data.get("last_error"),
+            }
+
+        minutes_left: int | None = None
+        try:
+            end = datetime.fromisoformat(f"{lesson['date']}T{lesson['end']}")
+            now = dt_util.now()
+            comparison_now = now.replace(tzinfo=None) if now.tzinfo else now
+            minutes_left = max(0, int((end - comparison_now).total_seconds() // 60))
+        except (KeyError, TypeError, ValueError):
+            pass
+
+        return {
+            "lekcja": lesson,
+            "przedmiot": lesson.get("subject"),
+            "od": lesson.get("start"),
+            "do": lesson.get("end"),
+            "nauczyciel": lesson.get("teacher"),
+            "sala": lesson.get("room"),
+            "numer_lekcji": lesson.get("number"),
+            "zastepstwo": lesson.get("changed", False),
+            "minut_do_konca": minutes_left,
+            "status_danych": data.get("source", "none"),
+            "dane_aktualne": data.get("fresh", False),
+            "ostatnia_poprawna_aktualizacja": data.get("last_successful_update"),
+            "ostatni_blad": data.get("last_error"),
         }
 
 
