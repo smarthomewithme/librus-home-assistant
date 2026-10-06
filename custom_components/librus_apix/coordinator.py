@@ -195,6 +195,8 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         "komentarz": grade.get("comment", ""),
                         "nauczyciel": grade["teacher"],
                         "semestr": grade.get("semester"),
+                        "waga": grade.get("weight"),
+                        "liczy_do_sredniej": grade.get("counts_to_average"),
                         "jest_nowa": _is_recent(grade["date"]),
                     }
                 )
