@@ -15,7 +15,14 @@ from homeassistant.helpers.event import async_track_time_change
 
 from .acknowledgements import ACK_CATEGORIES, LibrusAcknowledgements
 from .api import LibrusApiClient
-from .const import DOMAIN, TIMETABLE_REFRESH_TIMES
+from .const import (
+    API_BACKEND_CURRENT,
+    API_BACKEND_LEGACY,
+    CONF_API_BACKEND,
+    DOMAIN,
+    TIMETABLE_REFRESH_TIMES,
+)
+from .new_api_client import NewSynergiaApiClient
 from .smart_client import SmartHomeLibrusApiClient
 from .smart_coordinator import SmartHomeLibrusDataUpdateCoordinator
 from .timetable_coordinator import LibrusTimetableCoordinator
@@ -111,10 +118,25 @@ async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Uruchom jedno konto Librus Synergia."""
-    client = SmartHomeLibrusApiClient(
-        entry.data[CONF_USERNAME],
-        entry.data[CONF_PASSWORD],
+    backend = entry.options.get(
+        CONF_API_BACKEND,
+        entry.data.get(CONF_API_BACKEND, API_BACKEND_LEGACY),
     )
+    client = (
+        NewSynergiaApiClient(
+            entry.data[CONF_USERNAME],
+            entry.data[CONF_PASSWORD],
+            hass,
+            entry.entry_id,
+        )
+        if backend == API_BACKEND_CURRENT
+        else SmartHomeLibrusApiClient(
+            entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD]
+        )
+    )
+    if backend == API_BACKEND_CURRENT:
+        await client.async_restore()
+
     if not await client.async_authenticate():
         _LOGGER.warning(
             "Pierwsze logowanie konta %s nie powiodło się; integracja użyje "
@@ -169,5 +191,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Wyładuj konto i jego platformy."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
+        runtime = hass.data[DOMAIN].pop(entry.entry_id, None)
+        client = runtime.get("client") if runtime else None
+        close = getattr(client, "async_close", None)
+        if close is not None:
+            await close()
     return unloaded

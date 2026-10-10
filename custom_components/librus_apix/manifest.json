@@ -11,7 +11,8 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/smarthomewithme/librus-home-assistant/issues",
   "requirements": [
-    "librus-apix==1.5.1"
+    "librus-apix==1.5.1",
+    "librus-synergia==0.3.21"
   ],
-  "version": "1.8.0-beta.1"
+  "version": "1.8.0-beta.2"
 }

@@ -4,6 +4,10 @@ from datetime import datetime, timedelta
 from typing import Any, Mapping
 
 DOMAIN = "librus_apix"
+
+CONF_API_BACKEND = "api_backend"
+API_BACKEND_LEGACY = "apix"
+API_BACKEND_CURRENT = "current"
 INTEGRATION_NAME = "Librus Synergia — Smart Home With Me"
 BLOG_URL = "https://www.smarthomewithme.com"
 

@@ -1,7 +1,7 @@
 # Librus Synergia — Smart Home With Me
 
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-custom%20integration-41BDF5)](https://www.home-assistant.io/)
-![Version](https://img.shields.io/badge/version-1.8.0--beta.1-blue)
+![Version](https://img.shields.io/badge/version-1.8.0--beta.2-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 Unofficial **Librus Synergia integration for Home Assistant**, developed and maintained by **Smart Home With Me**.
@@ -11,6 +11,19 @@ It brings school data from Librus into Home Assistant as normal sensors, binary 
 > This project is not affiliated with, endorsed by or supported by Librus. It uses the unofficial `librus-apix` library, so changes on the Librus side may temporarily affect data retrieval.
 
 ## Install in Home Assistant
+
+### Choosing the API backend (experimental in 1.8.0-beta.2)
+
+The integration offers two independent API engines:
+
+- **Classic API (librus-apix)** remains the default. Existing configuration entries keep using it, with the same stable domain, entity IDs, timetable cache and acknowledgement state.
+- **Current API (librus-synergia)** can be selected while **adding a new account**. It uses an independent session per student and supports the modern Librus login. The upstream library automatically handles kindergarten accounts where the normal timetable returns HTTP 403.
+
+The new backend is experimental and **not yet feature-complete**. In particular, the dedicated legacy **Student → Special achievements** and **Current behaviour** HTML views are not mapped; they show no items on new-backend accounts. Certain optional school modules can also be unavailable depending on account permissions. Never switch an existing production account before checking parity. Existing accounts can deliberately switch backends in **Settings → Devices & services → Librus → Configure (Options)**. The integration validates login with the target API before saving the switch, keeps the configuration entry and entity IDs, and does not modify the old read-state store. Before switching a production student account, back up Home Assistant and expect possible differences in which school data the two APIs expose. Reconfigure only edits the password.
+
+New API cookies are persisted in Home Assistant's private per-account storage so the same device identity can survive restarts. They are never put into Home Assistant sensor attributes or diagnostics. Treat the Home Assistant backup as sensitive because valid session cookies can authenticate to Librus.
+
+This branch has local contract tests for normalization; it still requires testing with a real kindergarten/restricted account before being marked stable. Sending Librus messages is **not part of this API fusion beta**.
 
 ### Recommended: HACS
 
@@ -34,7 +47,7 @@ Copy `custom_components/librus_apix` into `/config/custom_components/librus_apix
 
 ## What the integration can do
 
-Version **1.8.0-beta.1** continues moving dashboard logic into native Home Assistant entities while keeping the existing 1.7.x entity IDs and read-state model compatible.
+Version **1.8.0-beta.2** continues moving dashboard logic into native Home Assistant entities while keeping the existing 1.7.x entity IDs and read-state model compatible.
 
 ### Persistent read state — added in v1.7.0
 
@@ -306,7 +319,7 @@ The integration runs inside your Home Assistant instance.
 
 ## Version
 
-Development preview on this branch: **1.8.0-beta.1**  
+Development preview on this branch: **1.8.0-beta.2**  
 Current stable release on `main`: **1.7.0**
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete development history.
@@ -317,7 +330,10 @@ See [CHANGELOG.md](CHANGELOG.md) for the complete development history.
 
 This Smart Home With Me release uses:
 
-- [`librus-apix`](https://github.com/RustySnek/librus-apix) as the Librus access library,
+- [`librus-apix`](https://github.com/RustySnek/librus-apix) as the classic access library,
+- [`librus-synergia`](https://github.com/MichalZaniewicz/librus-synergia) (Michał Zaniewicz, MIT) as the separate modern-API client,
+- [`ha-librus-synergia`](https://github.com/MichalZaniewicz/ha-librus-synergia) for the kindergarten-account compatibility reference,
+- [`procaktomasz/LibrusSynergiaHA`](https://github.com/procaktomasz/LibrusSynergiaHA) for timetable and additional-activity interoperability research,
 - earlier open-source work from [`LibrusSynergiaHA`](https://github.com/LukMaverick/LibrusSynergiaHA).
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [LICENSE](LICENSE) for details.
