@@ -23,6 +23,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
 from . import new_api_transforms as normalize
+from .api import current_semester
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -127,7 +128,13 @@ class NewSynergiaApiClient:
 
     async def async_get_grades(self) -> list[dict[str, Any]] | None:
         snapshot = self._data("grades", "grade_categories")
-        return normalize.grades(snapshot) if snapshot else None
+        if snapshot is None:
+            return None
+        semester = current_semester()
+        return [
+            grade for grade in normalize.grades(snapshot)
+            if grade.get("semester") in (None, semester)
+        ]
 
     async def async_get_current_behavior(self) -> list[dict[str, Any]] | None:
         # Separate current-behaviour HTML grid is not exposed by this API.
