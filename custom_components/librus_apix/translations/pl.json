@@ -45,7 +45,8 @@
         "data": {
           "refresh_mode": "Tryb odświeżania danych",
           "data_refresh_interval": "Własny interwał danych",
-          "timetable_refresh_interval": "Plan lekcji"
+          "timetable_refresh_interval": "Plan lekcji",
+          "api_backend": "Silnik API (eksperymentalna zmiana)"
         },
         "data_description": {
           "refresh_mode": "Automatyczny: 5 min w dni robocze 06:00–18:00, 15 min 18:00–22:00, 30 min w weekend 06:00–22:00 i 60 min w nocy.",
