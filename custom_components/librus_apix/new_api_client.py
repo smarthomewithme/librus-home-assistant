@@ -139,15 +139,17 @@ class NewSynergiaApiClient:
     async def async_get_current_behavior(self) -> list[dict[str, Any]] | None:
         # Separate current-behaviour HTML grid is not exposed by this API.
         # Never invent grades or duplicate dedicated notes.
-        return []
+        return [] if self._snapshot is not None else None
 
     async def async_get_notes(self) -> list[dict[str, str]] | None:
         snapshot = self._data("notes")
         return normalize.notes(snapshot) if snapshot else None
 
-    async def async_get_special_achievements(self) -> list[dict[str, str]]:
+    async def async_get_special_achievements(
+        self,
+    ) -> list[dict[str, str]] | None:
         # The current API has no corresponding verified achievements endpoint.
-        return []
+        return [] if self._snapshot is not None else None
 
     async def async_get_messages(
         self, count: int = 10
