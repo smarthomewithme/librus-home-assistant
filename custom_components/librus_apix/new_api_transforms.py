@@ -243,9 +243,12 @@ def timetable_week(
                     "cancelled": cancelled,
                     "changed": changed,
                     "info": {
-                        "odwołana": cancelled,
-                        "zastępstwo": changed,
-                        "uwaga": str(lesson.substitution_note or ""),
+                        **({"odwołana": True} if cancelled else {}),
+                        **({"zastępstwo": True} if changed else {}),
+                        **(
+                            {"uwaga": str(lesson.substitution_note)}
+                            if lesson.substitution_note else {}
+                        ),
                     },
                 }
             )
