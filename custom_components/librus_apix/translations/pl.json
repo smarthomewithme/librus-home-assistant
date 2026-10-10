@@ -7,7 +7,8 @@
         "description": "Podaj dane logowania do konta ucznia. To integracja nieoficjalna.",
         "data": {
           "username": "Login",
-          "password": "Hasło"
+          "password": "Hasło",
+          "api_backend": "Silnik API Synergii"
         }
       },
       "reconfigure": {
