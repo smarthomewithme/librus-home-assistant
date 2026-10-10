@@ -65,8 +65,17 @@ class NewSynergiaApiClient:
     async def async_restore(self) -> None:
         """Reuse the per-account device cookie across HA restarts."""
         saved = await self._session_store.async_load()
-        if isinstance(saved, dict) and isinstance(saved.get("cookies"), list):
-            self._api = self._make_api(LibrusSessionData(**saved))
+        if not isinstance(saved, dict) or not isinstance(saved.get("cookies"), list):
+            return
+        try:
+            session = LibrusSessionData(
+                cookies=saved["cookies"],
+                logged_in_at=float(saved.get("logged_in_at", 0.0)),
+            )
+        except (TypeError, ValueError):
+            _LOGGER.warning("Pominięto nieprawidłową kopię sesji Synergii")
+            return
+        self._api = self._make_api(session)
 
     @property
     def needs_reauth(self) -> bool:
