@@ -118,7 +118,10 @@ async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Uruchom jedno konto Librus Synergia."""
-    backend = entry.data.get(CONF_API_BACKEND, API_BACKEND_LEGACY)
+    backend = entry.options.get(
+        CONF_API_BACKEND,
+        entry.data.get(CONF_API_BACKEND, API_BACKEND_LEGACY),
+    )
     client = (
         NewSynergiaApiClient(
             entry.data[CONF_USERNAME],
