@@ -20,6 +20,17 @@ assert SPEC and SPEC.loader
 module = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(module)
 
+TIMETABLE_SOURCE = (
+    Path(__file__).resolve().parents[1]
+    / "custom_components" / "librus_apix" / "timetable.py"
+)
+TIMETABLE_SPEC = importlib.util.spec_from_file_location(
+    "librus_new_api_timetable_test", TIMETABLE_SOURCE
+)
+assert TIMETABLE_SPEC and TIMETABLE_SPEC.loader
+timetable = importlib.util.module_from_spec(TIMETABLE_SPEC)
+TIMETABLE_SPEC.loader.exec_module(timetable)
+
 
 class KindergartenTests(unittest.TestCase):
     def test_preschool_blocks_have_real_subjects_even_without_lesson_number(self):
@@ -50,6 +61,45 @@ class KindergartenTests(unittest.TestCase):
         self.assertEqual(period["room"], "Sala Motylków")
         self.assertEqual(period["number"], 0)
         self.assertEqual(period["date_from"], "07:30")
+
+    def test_normalizer_preserves_room_and_active_state(self):
+        monday = date(2026, 10, 5)
+        block = N(
+            lesson_no=None, hour_from="07:30", hour_to="09:00",
+            subject_id=1, teacher_id=2, teacher_ids=(),
+            classroom_id=3, is_canceled=False, is_substitution=False,
+            substitution_note=None
+        )
+        week = module.timetable_week(
+            monday, {monday:[block]}, {1:"Rytmika"}, {2:"Pani Nowak"}, {3:"12"}
+        )
+        result = timetable.normalize_timetable([week])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["status"], "active")
+        self.assertEqual(result[0]["teacher"], "Pani Nowak")
+        self.assertEqual(result[0]["room"], "12")
+
+    def test_parallel_preschool_blocks_do_not_overwrite_each_other(self):
+        monday = date(2026, 10, 5)
+        a = N(
+            lesson_no=None, hour_from="07:30", hour_to="09:00",
+            subject_id=1, teacher_id=2, teacher_ids=(),
+            classroom_id=3, is_canceled=False, is_substitution=False,
+            substitution_note=None
+        )
+        b = N(
+            lesson_no=None, hour_from="07:30", hour_to="09:00",
+            subject_id=4, teacher_id=5, teacher_ids=(),
+            classroom_id=3, is_canceled=False, is_substitution=False,
+            substitution_note=None
+        )
+        week=module.timetable_week(
+            monday, {monday:[a,b]}, {1:"Rytmika",4:"Sport"},
+            {2:"Anna Nowak",5:"Jan Test"}, {3:"12"}
+        )
+        lessons=timetable.normalize_timetable([week])
+        self.assertEqual(len(lessons),2)
+        self.assertNotEqual(lessons[0]["lesson_key"],lessons[1]["lesson_key"])
 
     def test_cancellations_and_substitutions_are_preserved(self):
         monday = date(2026, 10, 5)
