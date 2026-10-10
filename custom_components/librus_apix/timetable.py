@@ -137,8 +137,17 @@ def normalize_period(period: Any, week_start: str = "") -> dict[str, Any] | None
     )
 
     subject = replacements["subject_swap"] or original_subject
-    teacher = replacements["teacher_swap"] or teacher_and_classroom
-    room = replacements["classroom_swap"]
+    teacher = (
+        replacements["teacher_swap"]
+        or str(_get(period, "teacher", "")).strip()
+        or teacher_and_classroom
+    )
+    room = (
+        replacements["classroom_swap"]
+        or str(_get(period, "room", "")).strip()
+    )
+    cancelled = cancelled or bool(_get(period, "cancelled", False))
+    changed = changed or bool(_get(period, "changed", False))
     number_raw = _get(period, "number", 0)
     try:
         number = int(number_raw)
@@ -152,6 +161,10 @@ def normalize_period(period: Any, week_start: str = "") -> dict[str, Any] | None
 
     status = "cancelled" if cancelled else ("changed" if changed else "active")
     lesson_key = f"{lesson_date}|{number}|{start}"
+    if number == 0:
+        # Kindergarten time blocks have no lesson number. Parallel blocks
+        # must not overwrite each other in the persistent timetable cache.
+        lesson_key = f"{lesson_key}|{subject}|{teacher}|{room}"
 
     return {
         "lesson_key": lesson_key,
