@@ -175,10 +175,14 @@ def attendance(snapshot: Any) -> list[dict[str, Any]]:
                 symbol = "sp"
             elif kind.is_presence_kind:
                 symbol = "ob"
+            elif "zwoln" in folded:
+                symbol = "zw"
             elif kind.is_excused_absence:
                 symbol = "u"
-            else:
+            elif "nieobec" in folded or "absenc" in folded:
                 symbol = "nb"
+            else:
+                symbol = "?"  # An unknown non-presence type is not a confirmed absence.
         result.append(
             {
                 "symbol": symbol,
