@@ -121,13 +121,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     backend = entry.data.get(CONF_API_BACKEND, API_BACKEND_LEGACY)
     client = (
         NewSynergiaApiClient(
-            entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD]
+            entry.data[CONF_USERNAME],
+            entry.data[CONF_PASSWORD],
+            hass,
+            entry.entry_id,
         )
         if backend == API_BACKEND_CURRENT
         else SmartHomeLibrusApiClient(
             entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD]
         )
     )
+    if backend == API_BACKEND_CURRENT:
+        await client.async_restore()
+
     if not await client.async_authenticate():
         _LOGGER.warning(
             "Pierwsze logowanie konta %s nie powiodło się; integracja użyje "
