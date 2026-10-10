@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.8.0-beta.2 — Experimental API fusion
+
+- Preserves `librus_apix` and the classic API as the default for every existing account.
+- Adds an opt-in modern `librus-synergia==0.3.21` client for new accounts, with isolated per-account authentication and independently persisted private device cookies.
+- Supports the current API login and delegates kindergarten timetable discovery and fallback (ordinary `Timetables` returning 403) to the typed library.
+- Normalizes current-API student details, grades, grade weights, descriptive grades, behaviour grades, notes, attendance, agenda, homework assignments, announcements, received message headers and individual message details for the existing HA entities.
+- Normalizes current-API lessons into the existing timetable cache model; supports blocks without lesson numbers and preserves teacher, room, cancellation and substitution status.
+- Adds contract tests for the optional modern API, especially kindergarten and overlapping timetable blocks.
+- Credits the related Tomasz and Michał projects, keeps the original source implementation independently authored.
+- Does not activate the new API automatically on existing accounts; no message sending or AI summary in this update.
+- Compatibility caveat: some HTML-only views such as Student → Special achievements and Current behaviour remain unmapped on the modern backend until live account testing.
+
 ## 1.8.0-beta.1
 
 - Added native **Current lesson** sensor with subject, period, teacher, classroom, substitution flag and minutes remaining. The sensor recalculates locally every minute without additional Librus requests.
