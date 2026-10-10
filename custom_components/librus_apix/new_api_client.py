@@ -9,13 +9,18 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from datetime import date
+from dataclasses import asdict
 from typing import Any
 
 from librus_synergia import (
     Librus,
     LibrusInvalidCredentialsError,
+    LibrusSessionData,
     LibrusError,
 )
+
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.storage import Store
 
 from . import new_api_transforms as normalize
 
@@ -25,13 +30,42 @@ _LOGGER = logging.getLogger(__name__)
 class NewSynergiaApiClient:
     """Adapt the current typed Librus API to the existing SHWM coordinators."""
 
-    def __init__(self, username: str, password: str) -> None:
-        self._api = Librus(
-            username, password, cache_reference_data=True
+    def __init__(
+        self, username: str, password: str, hass: HomeAssistant, entry_id: str
+    ) -> None:
+        self._username = username
+        self._password = password
+        self._session_store: Store[dict[str, Any]] = Store(
+            hass,
+            1,
+            f"librus_apix.current_api_session_{entry_id}",
+            private=True,
+            atomic_writes=True,
         )
+        self._api = self._make_api()
         self._snapshot: Any | None = None
         self._authorization_failed = False
         self._reauth_requested = False
+
+    def _make_api(
+        self, session_data: LibrusSessionData | None = None
+    ) -> Librus:
+        return Librus(
+            self._username,
+            self._password,
+            session_data=session_data,
+            on_session_update=self._save_session_update,
+            cache_reference_data=True,
+        )
+
+    async def _save_session_update(self, session: LibrusSessionData) -> None:
+        await self._session_store.async_save(asdict(session))
+
+    async def async_restore(self) -> None:
+        """Reuse the per-account device cookie across HA restarts."""
+        saved = await self._session_store.async_load()
+        if isinstance(saved, dict) and isinstance(saved.get("cookies"), list):
+            self._api = self._make_api(LibrusSessionData(**saved))
 
     @property
     def needs_reauth(self) -> bool:
@@ -55,6 +89,9 @@ class NewSynergiaApiClient:
         return True
 
     async def async_close(self) -> None:
+        session = self._api.session_data
+        if session is not None:
+            await self._save_session_update(session)
         await self._api.close()
 
     async def _refresh_snapshot(self) -> Any | None:
