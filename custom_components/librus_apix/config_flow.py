@@ -143,8 +143,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data = {
                 CONF_USERNAME: username,
                 CONF_PASSWORD: user_input[CONF_PASSWORD],
-                CONF_API_BACKEND: entry.data.get(
-                    CONF_API_BACKEND, API_BACKEND_LEGACY
+                CONF_API_BACKEND: entry.options.get(
+                    CONF_API_BACKEND,
+                    entry.data.get(CONF_API_BACKEND, API_BACKEND_LEGACY),
                 ),
             }
             try:
@@ -187,8 +188,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data = {
                 CONF_USERNAME: entry.data[CONF_USERNAME],
                 CONF_PASSWORD: user_input[CONF_PASSWORD],
-                CONF_API_BACKEND: entry.data.get(
-                    CONF_API_BACKEND, API_BACKEND_LEGACY
+                CONF_API_BACKEND: entry.options.get(
+                    CONF_API_BACKEND,
+                    entry.data.get(CONF_API_BACKEND, API_BACKEND_LEGACY),
                 ),
             }
             try:
@@ -234,10 +236,34 @@ class LibrusOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         """Zapisz interwały i przeładuj wpis przez listener integracji."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-
         options = self.config_entry.options
+        selected_backend = options.get(
+            CONF_API_BACKEND,
+            self.config_entry.data.get(CONF_API_BACKEND, API_BACKEND_LEGACY),
+        )
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            target_backend = user_input.get(CONF_API_BACKEND, selected_backend)
+            if target_backend != selected_backend:
+                try:
+                    await validate_input(
+                        self.hass,
+                        {
+                            CONF_USERNAME: self.config_entry.data[CONF_USERNAME],
+                            CONF_PASSWORD: self.config_entry.data[CONF_PASSWORD],
+                            CONF_API_BACKEND: target_backend,
+                        },
+                    )
+                except (AuthorizationError, LibrusInvalidCredentialsError):
+                    errors["base"] = "invalid_auth"
+                except (MaintananceError, LibrusError, OSError, ValueError):
+                    errors["base"] = "cannot_connect"
+                except Exception:
+                    _LOGGER.exception("Błąd przełączenia silnika Librusa")
+                    errors["base"] = "unknown"
+            if not errors:
+                return self.async_create_entry(title="", data=user_input)
+
         refresh_mode = option_refresh_mode(options)
         data_interval = option_minutes(
             options,
@@ -256,8 +282,18 @@ class LibrusOptionsFlow(config_entries.OptionsFlow):
 
         return self.async_show_form(
             step_id="init",
+            errors=errors,
             data_schema=vol.Schema(
                 {
+                    vol.Required(
+                        CONF_API_BACKEND,
+                        default=selected_backend,
+                    ): vol.In(
+                        {
+                            API_BACKEND_LEGACY: "Klasyczne API (librus-apix)",
+                            API_BACKEND_CURRENT: "Nowe API (eksperymentalne)",
+                        }
+                    ),
                     vol.Required(
                         CONF_REFRESH_MODE,
                         default=refresh_mode,
